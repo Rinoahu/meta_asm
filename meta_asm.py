@@ -53,15 +53,6 @@ def codonfreq(orf):
         pass
 
 
-# the euclidean distance
-def euclidean(x, y):
-    d = 0
-    for i in xrange(len(x)):
-        z = (x[i] - y[i])
-        d += z * z
-
-    return sqrt(d)
-
 mean = lambda x: 1. * sum(x) / len(x)
 
 def std(x):
@@ -71,6 +62,23 @@ def std(x):
         m = mean(x)
         var = sum([(elem - m) * (elem - m) for elem in x]) / (len(x) - 1.)
         return var ** .5
+
+
+# the euclidean distance
+def euclidean(x, y):
+    d = 0
+    for i in xrange(len(x)):
+        z = (x[i] - y[i])
+        d += z * z
+
+    return sqrt(d)
+
+# dist between x and y
+# the dist can be normalized by the norm of x or y
+def dist(x, y, n = 0):
+    nx, ny, nz = [elem ** .5 for elem in map(sum, [[xi ** 2 for xi in x], [yi ** 2 for yi in y], [(yi - xi) ** 2 for xi, yi in zip(x, y)]])]
+    return n == 0 and nz / nx or nz / ny
+
 
 # the pearson relationship
 def pearson(x, y):
@@ -90,12 +98,86 @@ def pearson(x, y):
     else:
         return b == c and 1. or 0.
 
-# dist between x and y
-# the dist can be normalized by the norm of x or y
-def dist(x, y, n = 0):
-    nx, ny, nz = [elem ** .5 for elem in map(sum, [[xi ** 2 for xi in x], [yi ** 2 for yi in y], [(yi - xi) ** 2 for xi, yi in zip(x, y)]])]
-    return n == 0 and nz / nx or nz / ny
 
+# Mann–Whitney U test
+# return the z score of U
+def mannwhitneyu(x, y):
+    n0, n1 = map(len, [x, y])
+    n = n0 + n1
+    val = [0] * n
+    lab = [0] * n
+    p0 = p1 = p2 = 0
+    while p0 < n0 and p1 < n1:
+        if x[p0] < y[p1]:
+            val[p2] = x[p0]
+            lab[p2] = 0
+            p0 += 1
+            p2 += 1
+
+        elif x[p0] > y[p1]:
+            val[p2] = y[p1]
+            lab[p2] = 1
+            p1 += 1
+            p2 += 1
+
+        else:
+            val[p2] = x[p0]
+            lab[p2] = 0
+            p0 += 1
+            p2 += 1
+
+            val[p2] = y[p1]
+            lab[p2] = 1
+            p1 += 1
+            p2 += 1
+
+    while p0 < n0:
+        val[p2] = x[p0]
+        lab[p2] = 0
+        p0 += 1
+        p2 += 1
+
+    while p1 < n1:
+        val[p2] = y[p1]
+        lab[p2] = 1
+        p1 += 1
+        p2 += 1
+
+    # correct the tie rank
+    # tied rank
+    ts = []
+    rank = range(n)
+    start = end = 0
+    for i in xrange(1, n):
+        if val[start] < val[i]:
+            if start < end:
+                ri = float(start + end) / (i - start)
+                ts.append(i - start)
+                #print 'hello', ri, i, start
+                for j in xrange(start, i):
+                    rank[j] = ri
+
+            start = i
+        else:
+            end = i
+
+    if start < end:
+        ri = float(start + end) / (n - start)
+        ts.append(n - start)
+        #print 'hello', ri
+        for j in xrange(start, n):
+            rank[j] = ri
+
+    u0 = n0 + sum([a for a, b in zip(rank, lab) if b == 0]) - n0 * (n0 + 1) / 2
+    u1 = n1 + sum([a for a, b in zip(rank, lab) if b == 1]) - n1 * (n1 + 1) / 2
+
+    u = u0 < u1 and u0 or u1
+    mu = n0 * n1 / 2.
+    sigma = ts and (n0 * n1 * (n + 1. - sum([t ** 3. - t for t in ts]) / n / (n - 1)) / 12) ** .5 or (n0 * n1 * (n + 1.) / 12) ** .5
+    z = (u - mu) / sigma
+    #print 'z u0 u1 u mu sigma n0 n1 n'
+    #return z, u0, u1, u, mu, sigma, n0, n1, n
+    return z
 
 # compare whether two dataset belong to same distrubtion, use the correlation
 def curve_cor(s0, s1, bins = 20):
@@ -221,7 +303,7 @@ class mat:
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
-def canopy(data, t1 = .6, t2 = .7, dist = pearson):
+def canopy(data, t1 = 3., t2 = 1., dist = pearson):
     #canopies = []
     canopies = open('canopies.npy', 'w')
     #idxs = range(len(data))
@@ -452,8 +534,7 @@ if __name__ == '__main__':
     import random
 
     # test code
-    '''
-    N = 1 * 10 ** 8
+    N = 1 * 10 ** 6
     a = array('B')
     for i in xrange(N):
         b = [random.random() for elem in xrange(10)]
@@ -462,9 +543,8 @@ if __name__ == '__main__':
         a.extend(d)
 
     x = mat(a, (N, 10), 'int8')
-    y = canopy(x)
+    y = canopy(x, dist = lambda x, y: abs(mannwhitneyu(x, y)))
     raise SystemExit()
-    '''
 
     #
     if len(sys.argv[1:]) < 2:
