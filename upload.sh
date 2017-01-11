@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm canopies.npy
+
 git config --global user.email xiaohu@iastate.edu
 git config --global user.name Rinoahu
 
