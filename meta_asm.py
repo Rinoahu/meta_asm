@@ -179,6 +179,11 @@ def mannwhitneyu(x, y):
     #return z, u0, u1, u, mu, sigma, n0, n1, n
     return z
 
+# ks test
+def ks_test(x, y):
+    pass
+
+
 # compare whether two dataset belong to same distrubtion, use the correlation
 def curve_cor(s0, s1, bins = 20):
     up = max(map(max, s0, s1))
@@ -303,7 +308,7 @@ class mat:
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
-def canopy(data, t1 = 3., t2 = 1., dist = pearson):
+def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
     #canopies = []
     canopies = open('canopies.npy', 'w')
     #idxs = range(len(data))
@@ -534,15 +539,17 @@ if __name__ == '__main__':
     import random
 
     # test code
-    N = 1 * 10 ** 6
-    a = array('B')
+    N = 1 * 10 ** 7
+    a = array('I')
     for i in xrange(N):
-        b = [random.random() for elem in xrange(10)]
-        c = sum(b) / 100
-        d = [int(elem / c) for elem in b]
+        b = [random.random() + (i / (N / 10)) for elem in xrange(32)]
+        b.sort()
+        #c = sum(b) / 100
+        #d = [int(elem / c) for elem in b]
+        d = [int(elem * 100) for elem in b]
         a.extend(d)
 
-    x = mat(a, (N, 10), 'int8')
+    x = mat(a, (N, 32), 'int8')
     y = canopy(x, dist = lambda x, y: abs(mannwhitneyu(x, y)))
     raise SystemExit()
 
