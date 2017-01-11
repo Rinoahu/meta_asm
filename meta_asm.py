@@ -69,7 +69,8 @@ def std(x):
         return 0
     else:
         m = mean(x)
-        return sum([(elem - m) * (elem - m) for elem in x]) / (len(x) - 1.)
+        var = sum([(elem - m) * (elem - m) for elem in x]) / (len(x) - 1.)
+        return var ** .5
 
 # the pearson relationship
 def pearson(x, y):
@@ -97,7 +98,7 @@ def dist(x, y, n = 0):
 
 
 # compare whether two dataset belong to same distrubtion, use the correlation
-def curve_cor(s0, s1, bins = 10):
+def curve_cor(s0, s1, bins = 20):
     up = max(map(max, s0, s1))
     lo = min(map(min, s0, s1))
     inc = (up - lo + 1.) / bins
@@ -113,16 +114,27 @@ def curve_cor(s0, s1, bins = 10):
     return pearson(h0, h1)
 
 # draw the kmer-freq distrubtion from sequence
-def khist(S, bins = 10):
+# remove the extreme point
+def khist(s, bins = 20):
+
+    # remove extreme point
+    u, r = mean(s), std(s)
+    # lower and up bound
+    lb, ub = u - r, u + r
+    S = [elem for elem in s if lb <= elem <= ub]
+    #print 'remove', len(s) - len(S), u, r, lb, ub
+    if not S:
+        S = s
+
+    # get kmer hist
     up, lo = max(S), min(S)
     inc = (up - lo + 1.) / bins
     h = [0] * bins
     for i in S:
         j = int((i - lo) // inc)
-        h[j] += 1.
+        h[j] += 1
 
     return h, lo, up, inc
-
 
 # 2d matrix class which is memory-efficent
 class mat:
@@ -309,14 +321,14 @@ def seq2n(s, k = 15, scale = 4, code = code):
             yield start
 
 
-# generate the table
+# generate the kmer frequence table
 def kmc(seq, buck, k = 5, scale = 4, code = code):
     N = len(seq)
     for i in xrange(N - k + 1):
         start = k2n(seq[i: i + k], scale = scale, code = code)
         buck[start] += 1
 
-# fast version of generate the table
+# fast version of generate the kmer frequence table
 def fkmc(seq, buck, k = 5, scale = 4, code = code):
     for i in seq2n(seq, k, scale, code):
         val = buck[i]
@@ -379,6 +391,9 @@ def fq2c(qry):
         seqs1 = parse(f1, 'fastq')
         #seqs1 = SeqIO.parse(f1, 'fastq')
         for i0, i1 in izip(seqs0, seqs1):
+            if i0.qual.count('N') > 20 or i1.qual.count('N') > 20:
+                continue
+
             fkmc(i0.seq, buck[flag], k, scale)
             fkmc(i1.seq, buck[flag], k, scale)
 
@@ -406,10 +421,16 @@ def fq2c(qry):
         seqs1 = parse(f1, 'fastq')
         #seqs1 = SeqIO.parse(f1, 'fastq')
         for i0, i1 in izip(seqs0, seqs1):
+            if i0.qual.count('N') > 20 or i1.qual.count('N') > 20:
+                continue
+
             output = [buck[flag][elem] for elem in seq2n(i0.seq, k, scale, code)]
             output.extend([buck[flag][elem] for elem in seq2n(i1.seq, k, scale, code)])
             #print max(output), min(output), mean(output), std(output), output
-            print map(str, khist(output))
+
+
+            A, B, C, D = khist(output)
+            print ' '.join(map(str, A + ['|', B, C, D]))
 
             # timing
             if itr % 1000000 == 0:
@@ -431,6 +452,7 @@ if __name__ == '__main__':
     import random
 
     # test code
+    '''
     N = 1 * 10 ** 8
     a = array('B')
     for i in xrange(N):
@@ -442,6 +464,7 @@ if __name__ == '__main__':
     x = mat(a, (N, 10), 'int8')
     y = canopy(x)
     raise SystemExit()
+    '''
 
     #
     if len(sys.argv[1:]) < 2:
