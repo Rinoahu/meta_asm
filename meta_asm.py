@@ -7,11 +7,11 @@
 from Bio import SeqIO
 from array import array
 #import numpy as np
-from math import sqrt
+from math import sqrt, erf, erfc
 from random import shuffle
 from time import time
 from itertools import izip
-
+from multiprocessing import Pool
 
 # the sequence class
 class Seq:
@@ -99,9 +99,46 @@ def pearson(x, y):
         return b == c and 1. or 0.
 
 
+# Cumulative Normal Distrubtion
+ncdf = lambda x : erfc(-x / 1.4142135623730951) / 2
+
+# rank the sorted data
+def rankdata(val):
+    n = len(val)
+    ts = []
+    rank = range(n)
+    start = end = 0
+    for i in xrange(1, n):
+        if val[start] < val[i]:
+            if start < end:
+                #ri = float(start + end) / (i - start)
+                ri = float(start + end) / 2.
+                ts.append(i - start)
+                #print 'hello', ri, i, start
+                for j in xrange(start, i):
+                    rank[j] = ri
+
+            start = i
+        else:
+            end = i
+
+    if start < end:
+        ri = float(start + end) / (n - start)
+        ts.append(n - start)
+        #print 'hello', ri
+        for j in xrange(start, n):
+            rank[j] = ri
+
+    for i in xrange(n):
+        rank[i] += 1
+    return rank, ts
+
+# tiecorrect
+tiecorrect = lambda ts, n: ts and 1 - sum([t ** 3. - t for t in ts]) / (n ** 3 - n) or 1
+
 # Mann–Whitney U test
 # return the z score of U
-def mannwhitneyu(x, y):
+def mannwhitneyu(x, y, use_continuity = True, alternative = 'two-sided'):
     n0, n1 = map(len, [x, y])
     n = n0 + n1
     val = [0] * n
@@ -145,6 +182,7 @@ def mannwhitneyu(x, y):
 
     # correct the tie rank
     # tied rank
+    '''
     ts = []
     rank = range(n)
     start = end = 0
@@ -167,17 +205,27 @@ def mannwhitneyu(x, y):
         #print 'hello', ri
         for j in xrange(start, n):
             rank[j] = ri
+    '''
+    rank, ts = rankdata(val)
+    rank0 = sum([a for a, b in izip(rank, lab) if b == 0])
 
-    u0 = n0 + sum([a for a, b in zip(rank, lab) if b == 0]) - n0 * (n0 + 1) / 2
-    u1 = n1 + sum([a for a, b in zip(rank, lab) if b == 1]) - n1 * (n1 + 1) / 2
+    u0 = n0 * n1 + n0 * (n0 + 1) / 2. - rank0
+    #u1 = n1 + sum([a for a, b in zip(rank, lab) if b == 1]) - n1 * (n1 + 1) / 2
+    u1 = n0 * n1 - u0
 
-    u = u0 < u1 and u0 or u1
+    u = min(u0, u1)
     mu = n0 * n1 / 2.
-    sigma = ts and (n0 * n1 * (n + 1. - sum([t ** 3. - t for t in ts]) / n / (n - 1)) / 12) ** .5 or (n0 * n1 * (n + 1.) / 12) ** .5
-    z = (u - mu) / sigma
+    var = n0 * n1 * (n + 1) * tiecorrect(ts, n) / 12.
+    sd = var ** .5
+    z = use_continuity and abs(u - mu) - .5 / sd or abs(u - mu) / sd
     #print 'z u0 u1 u mu sigma n0 n1 n'
-    #return z, u0, u1, u, mu, sigma, n0, n1, n
-    return z
+    if z >= 0:
+        p = 2 - 2 * ncdf(z)
+    else:
+        p = 2 * ncdf(z)
+    #return u, p
+    #return abs(z)
+    return p
 
 # ks test
 def ks_test(x, y):
@@ -296,10 +344,12 @@ class mat:
         elif isinstance(x, slice) and not isinstance(y, slice):
             for i in xrange(X):
                 self.data[Y * i + y] = z
-
         else:
             self.data[:] = z
 
+    def __iter__(self):
+        for i in xrange(self.shape[0]):
+            yield self[i, :]
 
     def __len__(self):
         return self.shape[0]
@@ -308,7 +358,8 @@ class mat:
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
-def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
+#def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
+def canopy(data, t1 = .1, t2 = .2, dist = mannwhitneyu):
     #canopies = []
     canopies = open('canopies.npy', 'w')
     #idxs = range(len(data))
@@ -337,7 +388,7 @@ def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
         keep = array('i')
         #del keep[:]
 
-        if dist == pearson:
+        if dist == pearson or mannwhitneyu:
             print 'pearson'
             for elem in idxs:
             #while idxs:
@@ -516,13 +567,17 @@ def fq2c(qry):
             rev = [buck[flag][elem] for elem in seq2n(i1.seq, k, scale, code)]
             med = len(fwd) // 2
             start, end = med - 16, med + 16
-            output = fwd[start: end] + rev[start: end]
+            # for test, only keep positive
+            #output = fwd[start: end] + rev[start: end]
+            output = fwd[start: end]
             output.sort()
-            #print max(output), min(output), mean(output), std(output), output
+            if len(output) < 32:
+                output.extend([0] * (32 - len(output)))
 
+            #print max(output), min(output), mean(output), std(output), output
             #A, B, C, D = khist(output)
             #print ' '.join(map(str, A + ['|', B, C, D]))
-            print ' '.join(map(str, output))
+            #print ' '.join(map(str, output))
 
             # timing
             if itr % 1000000 == 0:
