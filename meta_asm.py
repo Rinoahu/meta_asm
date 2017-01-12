@@ -511,13 +511,17 @@ def fq2c(qry):
             if i0.qual.count('N') > 20 or i1.qual.count('N') > 20:
                 continue
 
-            output = [buck[flag][elem] for elem in seq2n(i0.seq, k, scale, code)]
-            output.extend([buck[flag][elem] for elem in seq2n(i1.seq, k, scale, code)])
+            output = []
+            fwd = [buck[flag][elem] for elem in seq2n(i0.seq, k, scale, code)]
+            rev = [buck[flag][elem] for elem in seq2n(i1.seq, k, scale, code)]
+            med = len(fwd) // 2
+            start, end = med - 16, med + 16
+            output = fwd[start: end] + rev[start: end]
             #print max(output), min(output), mean(output), std(output), output
 
-
-            A, B, C, D = khist(output)
-            print ' '.join(map(str, A + ['|', B, C, D]))
+            #A, B, C, D = khist(output)
+            #print ' '.join(map(str, A + ['|', B, C, D]))
+            print ' '.join(map(str, output))
 
             # timing
             if itr % 1000000 == 0:
@@ -538,6 +542,7 @@ if __name__ == '__main__':
     from random import choice
     import random
 
+    '''
     # test code
     N = 1 * 10 ** 7
     a = array('I')
@@ -552,6 +557,7 @@ if __name__ == '__main__':
     x = mat(a, (N, 32), 'int8')
     y = canopy(x, dist = lambda x, y: abs(mannwhitneyu(x, y)))
     raise SystemExit()
+    '''
 
     #
     if len(sys.argv[1:]) < 2:
