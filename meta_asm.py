@@ -517,6 +517,7 @@ def fq2c(qry):
             med = len(fwd) // 2
             start, end = med - 16, med + 16
             output = fwd[start: end] + rev[start: end]
+            output.sort()
             #print max(output), min(output), mean(output), std(output), output
 
             #A, B, C, D = khist(output)
