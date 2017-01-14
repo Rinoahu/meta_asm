@@ -116,23 +116,11 @@ def seq2n(s, k = 15, scale = 4, code = code):
             start = s2n_next(start, k, scale, code, i)
             yield start
 
-
-# convert kmer to number from a seq
-def seq2n(s, k = 15, scale = 4, code = code):
-    if len(s) <= k:
-        yield k2n(s, scale, code)
-    else:
-        start = k2n(s[: k], scale, code)
-        yield start
-        for i in s[k: ]:
-            start = s2n_next(start, k, scale, code, i)
-            yield start
-
-
-
 # cdf of normal distribution
 ncdf = lambda x : erfc(-x / 1.4142135623730951) / 2
 
+
+# the sum, mean and std of an array/list
 def sum(x):
     flag = 0
     #a = [[1] * 100 for elem in xrange(pow(10, 6))]
@@ -140,6 +128,18 @@ def sum(x):
         flag += i
         #a.append(i)
     return flag
+
+
+mean = lambda x: 1. * sum(x) / len(x)
+
+def std(x):
+    if len(x) <= 1:
+        return 0
+    else:
+        m = mean(x)
+        var = sum([(elem - m) * (elem - m) for elem in x]) / (len(x) - 1.)
+        return sqrt(var)
+
 
 # rank the sorted data
 def rankdata(val):
@@ -253,11 +253,48 @@ def mannwhitneyu(x, y, use_continuity = True):
     return u, p
 
 
+# the euclidean distance
+def euclidean(x, y):
+    d = 0
+    for i in xrange(len(x)):
+        z = (x[i] - y[i])
+        d += z * z
+
+    return sqrt(d)
+
+# dist between x and y
+# the dist can be normalized by the norm of x or y
+def dist(x, y, norm = True):
+    nx, ny, nz = [sqrt(elem) for elem in map(sum, [[xi * xi for xi in x], [yi * yi for yi in y], [(yi - xi) * (yi - xi) for xi, yi in zip(x, y)]])]
+    return norm and nz / nx or nz / ny
+
+# the pearson relationship
+def pearson(x, y):
+    N, M = len(x), len(y)
+    assert N == M
+    x_m, y_m = mean(x), mean(y)
+    a = b = c = 0.
+    for i in xrange(N):
+        xi, yi = x[i] - x_m, y[i] - y_m
+        a += xi * yi
+        b += xi * xi
+        c += yi * yi
+
+    d = sqrt(b * c)
+    if d > 0:
+        return a / d
+    else:
+        return b == c and 1. or 0.
+
+
+
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
 #def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
-def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
+#def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
+def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
+
     canopies = []
     #canopies = open('canopies.npy', 'w')
     idxs = range(len(data))
@@ -286,7 +323,7 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
         #del keep[:]
 
         if dist == mannwhitneyu:
-            print 'pearson'
+            print 'mann'
             for elem in idxs:
             #while idxs:
             #    elem = idxs.pop()
@@ -298,16 +335,30 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
                     keep.append(elem)
                 #print 'size', len(idxs)
 
-        #else:
-        #    for elem in idxs:
+        elif dist == pearson:
+            print 'pearson'
+            for elem in idxs:
+            #while idxs:
+            #    elem = idxs.pop()
+                y = [intmask(val) for val in data[elem]]
+                cor = dist(x, y)
+                if cor > t1:
+                    can.append(elem)
+                if cor < t2:
+                    keep.append(elem)
+                #print 'size', len(idxs)
+
+
+        else:
+            for elem in idxs:
         #    #while idxs:
         #    #    elem = idxs.pop()
-        #        y = [intmask(val) for val in data[elem]]
-        #        p = dist(x, y)
-        #        if p < t1:
-        #            can.append(elem)
-        #        if p > t2:
-        #            keep.append(elem)
+                y = [intmask(val) for val in data[elem]]
+                d = dist(x, y)
+                if d < t1:
+                    can.append(elem)
+                if d > t2:
+                    keep.append(elem)
 
         #canopies.append(can)
         # use -1 as sep and save to disk
@@ -345,6 +396,8 @@ def run(n, qry):
         y = [intmask(elem) for elem in xrange(32)]
         #x = y = [0] * 32
         u, p = mannwhitneyu(x, y, True)
+        p = pearson(x, y)
+
     print 'p value is', u, p
 
     print k2n('ta' * 12), intmask(int('123'))
