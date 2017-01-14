@@ -12,6 +12,9 @@ from random import shuffle
 from time import time
 from itertools import izip
 from multiprocessing import Pool
+import multiprocessing as mp
+from functools import partial
+
 
 # the sequence class
 class Seq:
@@ -112,7 +115,7 @@ def rankdata(val):
         if val[start] < val[i]:
             if start < end:
                 #ri = float(start + end) / (i - start)
-                ri = float(start + end) / 2.
+                ri = (start + end) / 2.
                 ts.append(i - start)
                 #print 'hello', ri, i, start
                 for j in xrange(start, i):
@@ -123,14 +126,16 @@ def rankdata(val):
             end = i
 
     if start < end:
-        ri = float(start + end) / (n - start)
+        ri = float(start + end) / 2.
         ts.append(n - start)
         #print 'hello', ri
         for j in xrange(start, n):
             rank[j] = ri
 
-    for i in xrange(n):
-        rank[i] += 1
+    # correct start from 0
+    #for i in xrange(n):
+    #    rank[i] += 1
+
     return rank, ts
 
 # tiecorrect
@@ -182,32 +187,10 @@ def mannwhitneyu(x, y, use_continuity = True, alternative = 'two-sided'):
 
     # correct the tie rank
     # tied rank
-    '''
-    ts = []
-    rank = range(n)
-    start = end = 0
-    for i in xrange(1, n):
-        if val[start] < val[i]:
-            if start < end:
-                ri = float(start + end) / (i - start)
-                ts.append(i - start)
-                #print 'hello', ri, i, start
-                for j in xrange(start, i):
-                    rank[j] = ri
-
-            start = i
-        else:
-            end = i
-
-    if start < end:
-        ri = float(start + end) / (n - start)
-        ts.append(n - start)
-        #print 'hello', ri
-        for j in xrange(start, n):
-            rank[j] = ri
-    '''
     rank, ts = rankdata(val)
-    rank0 = sum([a for a, b in izip(rank, lab) if b == 0])
+    #rank0 = sum([a for a, b in izip(rank, lab) if b == 0])
+    # add n0 to correct the start from 0
+    rank0 = sum([a for a, b in izip(rank, lab) if b == 0]) + n0
 
     u0 = n0 * n1 + n0 * (n0 + 1) / 2. - rank0
     #u1 = n1 + sum([a for a, b in zip(rank, lab) if b == 1]) - n1 * (n1 + 1) / 2
@@ -354,12 +337,42 @@ class mat:
     def __len__(self):
         return self.shape[0]
 
+# dist calculation for one vs many
+def Mdist(rg, q, data, dist = mannwhitneyu):
+    start, end = rg
+    x, shape = data
+    xs = mat(x, shape)
+    return [dist(q, xs[elem, :]) for elem in xrange(start, end)]
+
+def mdist(z):
+    rg, q, dist = z
+    start, end = rg
+    x, shape = data
+    xs = mat(x, shape)
+    return [dist(q, xs[elem, :]) for elem in xrange(start, end)]
+
+
+# parallel for Mdist
+def Pmdist(q, t, dist = mannwhitneyu):
+    shape = t.shape
+    raw = t.data
+    data = (raw, shape)
+    global data
+    #dist = partial(Mdist, q = q, data = (raw, shape), dist = dist)
+    step = 10000
+    rg = range(0, shape[0], step) + [shape[0]]
+
+    pool = Pool()
+    output = pool.map(mdist, [[(i, j), t[0, :], dist] for i, j in zip(rg[::-1], rg[1::])])
+    return output
+    #return pool.map(dist, [(i, j) for i, j in zip(rg[::-1], rg[1::])])
+
 
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
 #def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
-def canopy(data, t1 = .1, t2 = .2, dist = mannwhitneyu):
+def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
     #canopies = []
     canopies = open('canopies.npy', 'w')
     #idxs = range(len(data))
