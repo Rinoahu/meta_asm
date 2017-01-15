@@ -4,20 +4,43 @@
 #  Copyright © XYM
 # CreateTime: 2017-01-13 15:34:46
 
-
+from array import array
 from math import sqrt, erf, exp, pow
-#from rpython.flowspace.operation import inplace_pow
 import math
 import itertools
 from itertools import izip
 from random import random
 from rpython.rlib import rrandom
 from rpython.rlib.rfloat import erfc
-from array import array
 from rpython.rtyper.lltypesystem.rffi import r_ushort #r_uint, r_int_fast64_t
 from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint
+from rpython.rlib import rfile
+from rpython.rlib.listsort import TimSort
+#from struct import pack
 from time import time
 import gc
+
+
+# the pack
+def pack(dtype, val):
+    t = dtype.lower()
+    if t == 'h':
+        n = 2
+    elif t == 'i':
+        n = 4
+    elif t == 'l':
+        n = 8
+    else:
+        n = 1
+
+    string = [''] * n
+    for i in xrange(n):
+        string[i] = chr(val & 0xFF)
+        val = val >> 8
+
+    return ''.join(string)
+
+
 
 # open a file
 def fopen(name, chk = 128):
@@ -292,11 +315,11 @@ def pearson(x, y):
 # for euc, t1 > t2
 # for cor, t1 < t2
 #def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
-#def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
-def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
+def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
+#def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
 
-    canopies = []
-    #canopies = open('canopies.npy', 'w')
+    #canopies = []
+    canopies = open('canopies.npy', 'w')
     idxs = range(len(data))
     #idxs =  array('i')
     #for i in xrange(len(data)):
@@ -362,10 +385,11 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
 
         #canopies.append(can)
         # use -1 as sep and save to disk
-        #can.append(-1)
-        #can.tofile(canopies)
-        canopies.extend(can)
-        print 'can size', len(can), len(keep), len(canopies)
+        can.append(-1)
+        string = ''.join([pack('i', elem) for elem in can])
+        canopies.write(string)
+        print 'can size', len(can), len(keep)
+        #print 'can size', len(can), len(keep), len(canopies)
         #del x, can, idxs
         idxs = keep
         #del keep
@@ -373,7 +397,7 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
         print 'use time', time() - init1_time, 'total', time() - init0_time
         init1_time = time()
 
-    #canopies.close()
+    canopies.close()
     return canopies
 
 
@@ -381,7 +405,14 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
 #def run(x, y, n):
 def run(n, qry):
     rg = rrandom.Random()
-    a = [[r_ushort(int(rg.random() * pow(2, 15) - 1)) for elem0 in xrange(32)] for elem1 in xrange(n)]
+    a = []
+    for i in xrange(n):
+        #b = [r_ushort(int(rg.random() * pow(2, 15) - 1)) for elem0 in xrange(32)]
+        b = [int(rg.random() * pow(2, 15) - 1) for elem0 in xrange(32)]
+        #b.sort()
+        TimSort(b).sort()
+        a.append([r_ushort(elem) for elem in b])
+    #a = [TimSort([r_ushort(int(rg.random() * pow(2, 15) - 1)) for elem0 in xrange(32)]).sort() for elem1 in xrange(n)]
     #print 'short add', a[0][0] + a[0][0]
     u = p = 0
     for i in xrange(1):
