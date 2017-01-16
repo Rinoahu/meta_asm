@@ -315,11 +315,11 @@ def pearson(x, y):
 # for euc, t1 > t2
 # for cor, t1 < t2
 #def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
-def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
+def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
 #def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
 
-    #canopies = []
-    canopies = open('canopies.npy', 'w')
+    canopies = []
+    _o = open('canopy.npy', 'w')
     idxs = range(len(data))
     #idxs =  array('i')
     #for i in xrange(len(data)):
@@ -383,13 +383,16 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
                 if d > t2:
                     keep.append(elem)
 
-        #canopies.append(can)
         # use -1 as sep and save to disk
         can.append(-1)
-        string = ''.join([pack('i', elem) for elem in can])
-        canopies.write(string)
-        print 'can size', len(can), len(keep)
-        #print 'can size', len(can), len(keep), len(canopies)
+        canopies.extend(can)
+        if len(canopies) >= 1000000:
+            string = ''.join([pack('i', elem) for elem in canopies])
+            _o.write(string)
+            canopies = []
+        #canopies.write(string)
+        #print 'can size', len(can), len(keep)
+        print 'can size', len(can), len(keep), len(canopies)
         #del x, can, idxs
         idxs = keep
         #del keep
@@ -397,7 +400,12 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
         print 'use time', time() - init1_time, 'total', time() - init0_time
         init1_time = time()
 
-    canopies.close()
+    if len(canopies) > 0:
+        string = ''.join([pack('i', elem) for elem in canopies])
+        _o.write(string)
+        canopies = []
+
+    #canopies.close()
     return canopies
 
 
@@ -458,6 +466,10 @@ def entry_point(argv):
         K = 10
 
     qry = argv[2]
+
+    fac = lambda x: sum(range(x))
+    print fac(K)
+
     #x = range(32)
     #y = range(32, 64)
     #run(x, y, K)
@@ -470,3 +482,4 @@ def target(*args):
 if __name__ == "__main__":
     import sys
     entry_point(sys.argv)
+
