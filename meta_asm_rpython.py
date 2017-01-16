@@ -4,11 +4,11 @@
 #  Copyright © XYM
 # CreateTime: 2017-01-13 15:34:46
 
-from array import array
+#from array import array
 from math import sqrt, erf, exp, pow
 import math
 import itertools
-from itertools import izip
+#from itertools import izip
 from random import random
 from rpython.rlib import rrandom
 from rpython.rlib.rfloat import erfc
@@ -20,6 +20,37 @@ from rpython.rlib.listsort import TimSort
 from time import time
 import gc
 
+# quicksort
+def qsort(x, y, k = 10):
+    n = len(x)
+    for i in xrange(n):
+        for j in xrange(i + 1, n):
+            xi, xj = x[i], x[j]
+            if y[xi: xi + k] > y[xj: xj + k]:
+                x[i], x[j] = x[j], x[i]
+
+
+# map function
+def map(fuc, arr):
+    #n = len(arr)
+    #return [fuc(arr[elem]) for elem in xrange(n)]
+    return [fuc(elem) for elem in arr]
+
+
+# the izip function
+def izip(seqs):
+    iseqs = [iter(elem) for elem in seqs]
+    while 1:
+        try:
+            #yield [iarr.next() for iarr in iarrays]
+            #outs = []
+            #for i in xrange(n):
+            #    out = arrays[i].next()
+            #    outs.append(out)
+            yield [seq.next() for seq in iseqs]
+            #return outs
+        except:
+            break
 
 # the pack
 def pack(dtype, val):
@@ -83,7 +114,7 @@ def parse(f, mode = 'fastq'):
     seq = Seq()
     output = []
     for i in f:
-        print 'seq is', i
+        #print 'seq is', i
         if len(output) == 4:
             #seq.id, seq.seq, seq.description, seq.qual = output
             #seq.update(*output)
@@ -334,7 +365,8 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
     flag = 0
     while idxs:
         idx = idxs.pop()
-        x = [intmask(val) for val in data[idx]]
+        #x = [intmask(val) for val in data[idx]]
+        x = map(intmask, data[idx])
 
         can = [idx]
         #can = array('i', [idx])
@@ -349,8 +381,9 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
             print 'mann'
             for elem in idxs:
             #while idxs:
-            #    elem = idxs.pop()
-                y = [intmask(val) for val in data[elem]]
+                #elem = idxs.pop()
+                #y = [intmask(val) for val in data[elem]]
+                y = map(intmask, data[elem])
                 u, p = dist(x, y)
                 if p > t1:
                     can.append(elem)
@@ -362,8 +395,9 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
             print 'pearson'
             for elem in idxs:
             #while idxs:
-            #    elem = idxs.pop()
-                y = [intmask(val) for val in data[elem]]
+                #elem = idxs.pop()
+                #y = [intmask(val) for val in data[elem]]
+                y = map(intmask, data[elem])
                 cor = dist(x, y)
                 if cor > t1:
                     can.append(elem)
@@ -374,9 +408,11 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
 
         else:
             for elem in idxs:
-        #    #while idxs:
-        #    #    elem = idxs.pop()
-                y = [intmask(val) for val in data[elem]]
+            #while idxs:
+                #elem = idxs.pop()
+                #y = [intmask(val) for val in data[elem]]
+                y = map(intmask, data[elem])
+
                 d = dist(x, y)
                 if d < t1:
                     can.append(elem)
@@ -409,7 +445,6 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
     return canopies
 
 
-
 #def run(x, y, n):
 def run(n, qry):
     rg = rrandom.Random()
@@ -419,10 +454,16 @@ def run(n, qry):
         b = [int(rg.random() * pow(2, 15) - 1) for elem0 in xrange(32)]
         #b.sort()
         TimSort(b).sort()
+        #a.append(b)
         a.append([r_ushort(elem) for elem in b])
+        #a.append(d)
     #a = [TimSort([r_ushort(int(rg.random() * pow(2, 15) - 1)) for elem0 in xrange(32)]).sort() for elem1 in xrange(n)]
     #print 'short add', a[0][0] + a[0][0]
     u = p = 0
+    Atmp = range(6)
+    dna = 'atgcgc'
+    qsort(Atmp, dna)
+    print 'qsort', Atmp, [dna[elem] for elem in Atmp]
     for i in xrange(1):
         #x = [0] * 32
         #y = [0] * 32
@@ -432,7 +473,10 @@ def run(n, qry):
         #x = [rg.random() for elem in xrange(32)]
         #y = [rg.random() for elem in xrange(32)]
         x = [intmask(elem) for elem in [r_ushort(0)] * 32]
+        #x = map(intmask, [0] * 32)
         y = [intmask(elem) for elem in xrange(32)]
+        #rgs = range(32)
+        #y = map(intmask, rgs)
         #x = y = [0] * 32
         u, p = mannwhitneyu(x, y, True)
         p = pearson(x, y)
@@ -449,6 +493,10 @@ def run(n, qry):
     f1 = fopen(qry, 64)
     seqs0 = parse(f0)
     seqs1 = parse(f1)
+    for seq0, seq1 in izip([seqs0, seqs1]):
+        print seq0.seq, seq1.seq
+
+    '''
     while 1:
         try:
             seq0 = seqs0.next()
@@ -458,6 +506,7 @@ def run(n, qry):
             break
 
     return 1
+    '''
 
 def entry_point(argv):
     try:
