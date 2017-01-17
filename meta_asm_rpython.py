@@ -197,7 +197,7 @@ def fq2c(qry):
     flag = 0
     itr = 1
     init0 = init1 = time()
-    #for name0, name1 in zip(names[::2], names[1::2]):
+    #for name0, name1 in zip(names[0::2], names[1::2]):
     for i in xrange(0, len(names), 2):
         name0, name1 = names[i], names[i + 1]
         print 'qry0', name0, 'qry1', name1
@@ -225,13 +225,13 @@ def fq2c(qry):
 
         flag += 1
 
-    print 'buck', [[intmask(b1) for b1 in b0] for b0 in buck]
+    #print 'buck', [[intmask(b1) for b1 in b0] for b0 in buck]
 
     # convert the each reads to a freq hist
     flag = 0
     itr = 1
     init0 = init1 = time()
-    #for name0, name1 in zip(names[::2], names[1::2]):
+    #for name0, name1 in zip(names[0::2], names[1::2]):
     for i in xrange(0, len(names), 2):
         name0, name1 = names[i], names[i + 1]
         print 'qry0', name0, 'qry1', name1
