@@ -42,13 +42,7 @@ def izip(seqs):
     iseqs = [iter(elem) for elem in seqs]
     while 1:
         try:
-            #yield [iarr.next() for iarr in iarrays]
-            #outs = []
-            #for i in xrange(n):
-            #    out = arrays[i].next()
-            #    outs.append(out)
             yield [seq.next() for seq in iseqs]
-            #return outs
         except:
             break
 
@@ -100,12 +94,12 @@ def readline(f, chk = 128):
 
 
 class Seq:
-    def __init__(self, id = None, seq = None, description = None, qual = None ):
+    def __init__(self, id = '', seq = '', description = '', qual = ''):
         self.id = id
         self.seq = seq
         self.description = description
         self.qual = qual
-    def update(self, id = None, seq = None, description = None, qual = None ):
+    def update(self, id = '', seq = '', description = '', qual = ''):
         self.id = id
         self.seq = seq
         self.description = description
@@ -167,14 +161,128 @@ s2n_next = lambda start, ksize, scale, code, char: start % int(pow(scale, (ksize
 
 # convert kmer to number from a seq
 def seq2n(s, k = 15, scale = 4, code = code):
-    if len(s) <= k:
+    n = len(s)
+    if n <= k:
         yield k2n(s, scale, code)
     else:
-        start = k2n(s[: k], scale, code)
+        start = k2n(s[0: k], scale, code)
         yield start
-        for i in s[k: ]:
+        for i in s[k: n]:
             start = s2n_next(start, k, scale, code, i)
             yield start
+
+
+# kmer count function
+def kmc(seq, bucket, ksize, scale):
+    for i in seq2n(seq, ksize, scale):
+        val = intmask(bucket[i])
+        val = val < 65535 and val + 1 or val
+        bucket[i] = r_ushort(val)
+
+
+# count the kmer from the paired fastq file
+def fq2c(qry):
+    ksize = max(2, int(qry[0]))
+    names = qry[1: ]
+    D = len(names)
+    scale = 4
+    #buck = [array('H', [0]) * pow(scale, k) for elem in xrange(D // 2)]
+    #buck = [array('H', [0]) * scale ** k for elem in xrange(D // 2)]
+    #buck = np.zeros((D//2, scale ** k), 'int32')
+    N = int(pow(scale, ksize))
+    buck = [[r_ushort(0) for elem0 in xrange(N)] for elem1 in xrange(D // 2)]
+
+    print 'ksize, names, D, N, buck shape', ksize, names, D, N, len(buck), len(buck[0])
+
+    flag = 0
+    itr = 1
+    init0 = init1 = time()
+    #for name0, name1 in zip(names[::2], names[1::2]):
+    for i in xrange(0, len(names), 2):
+        name0, name1 = names[i], names[i + 1]
+        print 'qry0', name0, 'qry1', name1
+        f0 = open(name0, 'r')
+        f1 = open(name1, 'r')
+        seqs0 = parse(f0, 'fastq')
+        #seqs0 = SeqIO.parse(f0, 'fastq')
+        seqs1 = parse(f1, 'fastq')
+        #seqs1 = SeqIO.parse(f1, 'fastq')
+        for seq0, seq1 in izip([seqs0, seqs1]):
+            if seq0.qual.count('N') > 20 or seq1.qual.count('N') > 20:
+                continue
+
+            kmc(seq0.seq, buck[flag], ksize, scale)
+            kmc(seq1.seq, buck[flag], ksize, scale)
+
+            # timing
+            if itr % 1000000 == 0:
+                print 'iteration', itr, 'time', time() - init1, 'total time', time() - init0
+                init1 = time()
+            itr += 1
+
+        f0.close()
+        f1.close()
+
+        flag += 1
+
+    print 'buck', [[intmask(b1) for b1 in b0] for b0 in buck]
+
+    # convert the each reads to a freq hist
+    flag = 0
+    itr = 1
+    init0 = init1 = time()
+    #for name0, name1 in zip(names[::2], names[1::2]):
+    for i in xrange(0, len(names), 2):
+        name0, name1 = names[i], names[i + 1]
+        print 'qry0', name0, 'qry1', name1
+        f0 = open(name0, 'r')
+        f1 = open(name1, 'r')
+        seqs0 = parse(f0, 'fastq')
+        #seqs0 = SeqIO.parse(f0, 'fastq')
+        seqs1 = parse(f1, 'fastq')
+        #seqs1 = SeqIO.parse(f1, 'fastq')
+        for seq0, seq1 in izip([seqs0, seqs1]):
+            if seq0.qual.count('N') > 20 or seq1.qual.count('N') > 20:
+                continue
+
+            output = []
+            fwd = [intmask(buck[flag][elem]) for elem in seq2n(seq0.seq, ksize, scale, code)]
+            rev = [intmask(buck[flag][elem]) for elem in seq2n(seq1.seq, ksize, scale, code)]
+            med = len(fwd) // 2
+            step = 16
+            start, end = max(0, med - step), max(0, med + step)
+            # for test, only keep positive
+            output = fwd[start: end] + rev[start: end]
+            #output = fwd[start: end]
+            #output.sort()
+            TimSort(output).sort()
+
+            if len(output) < step * 2:
+                output.extend([0] * (step * 2 - len(output)))
+
+            #print max(output), min(output), mean(output), std(output), output
+            #A, B, C, D = khist(output)
+            #print ' '.join(map(str, A + ['|', B, C, D]))
+            #print ' '.join(map(str, output))
+            print 'output', ' '.join([str(out) for out in output])
+
+
+            # timing
+            if itr % 1000000 == 0:
+                print 'iteration', itr, 'time', time() - init1, 'total time', time() - init0
+                init1 = time()
+            itr += 1
+
+        f0.close()
+        f1.close()
+
+        flag += 1
+
+    return buck
+
+
+
+
 
 # cdf of normal distribution
 ncdf = lambda x : erfc(-x / 1.4142135623730951) / 2
@@ -453,6 +561,7 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
 
 #def run(x, y, n):
 def run(n, qry):
+    ksize = max(2, n)
     rg = rrandom.Random()
     a = []
     for i in xrange(n):
@@ -492,18 +601,26 @@ def run(n, qry):
     print k2n('ta' * 12), intmask(int('123'))
     test_seq = 'tgatcgctgtagctgatgctcatgctatgctatcgtagtcgtgctagctagcatcgatcgatcgctagaaacagctgcgtatctatctatatatatattaggagaatgtgagaga'
     test_n = seq2n(test_seq)
+    #for i in test_n:
+    #    print 'seq2n test', i
     canopy(a)
 
     print [r_uint(elem) for elem in test_n]
+    buck = [[r_ushort(0) for elem0 in xrange(pow(scale, ksize))] for elem1 in xrange(len(qry))]
     f0 = open(qry, 'r')
     f1 = open(qry, 'r')
     seqs0 = parse(f0)
     seqs1 = parse(f1)
     for seq0, seq1 in izip([seqs0, seqs1]):
-        print seq0.seq, seq1.seq
+        #print seq0.seq, seq1.seq
+        print 'test seq2n'
+        #print [nb for nb in seq2n(seq0.seq)]
+        kmc(seq0.seq, buck[0], ksize, scale)
 
     f0.close()
     f1.close()
+
+    print [intmask(elem) for elem in buck[0][:15]]
     '''
     while 1:
         try:
@@ -530,7 +647,10 @@ def entry_point(argv):
     #x = range(32)
     #y = range(32, 64)
     #run(x, y, K)
-    run(K, qry)
+    #run(K, qry)
+    buck = fq2c(argv[1:])
+    #for n0, n1 in zip([1,2,3], [2,3,4]):
+    #    print 'n0', 'n1', n0, n1
     return 0
 
 def target(*args):
