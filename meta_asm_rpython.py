@@ -74,9 +74,12 @@ def pack(dtype, val):
 
 
 # open a file
-def fopen(name, chk = 128):
+# readline from an open file
+#def fopen(name, chk = 128):
+def readline(f, chk = 128):
+
     #qry = args[0]
-    f = open(name, 'r')
+    #f = open(name, 'r')
     c = ''
     #b = []
     while 1:
@@ -89,11 +92,11 @@ def fopen(name, chk = 128):
         #yield b
         b[0] = c + b[0]
         for line in b[:-1]:
-            yield line
+            yield '%s\n'%line
 
         c = b[-1]
 
-    f.close()
+    #f.close()
 
 
 class Seq:
@@ -110,10 +113,13 @@ class Seq:
 
 
 # parse the fastq or fasta
-def parse(f, mode = 'fastq'):
+#def parse(f, mode = 'fastq'):
+def parse(f, dtype = 'fastq'):
+
     seq = Seq()
     output = []
-    for i in f:
+    #for i in f:
+    for i in readline(f):
         #print 'seq is', i
         if len(output) == 4:
             #seq.id, seq.seq, seq.description, seq.qual = output
@@ -489,13 +495,15 @@ def run(n, qry):
     canopy(a)
 
     print [r_uint(elem) for elem in test_n]
-    f0 = fopen(qry, 64)
-    f1 = fopen(qry, 64)
+    f0 = open(qry, 'r')
+    f1 = open(qry, 'r')
     seqs0 = parse(f0)
     seqs1 = parse(f1)
     for seq0, seq1 in izip([seqs0, seqs1]):
         print seq0.seq, seq1.seq
 
+    f0.close()
+    f1.close()
     '''
     while 1:
         try:
