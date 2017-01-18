@@ -15,6 +15,7 @@ from rpython.rlib.rfloat import erfc
 from rpython.rtyper.lltypesystem.rffi import r_ushort #r_uint, r_int_fast64_t
 from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint
 from rpython.rlib import rfile
+from rpython.rlib import rmmap
 from rpython.rlib.listsort import TimSort
 #from struct import pack
 from time import time
@@ -92,6 +93,17 @@ def readline(f, chk = 128):
 
     #f.close()
 
+# use rmmap to make realine code simple
+def readline_mmap(f):
+    handle = rmmap.mmap(f.fileno(), 0, access = rmmap.ACCESS_READ)
+    for i in xrange(handle.size):
+        line = handle.readline()
+        if line != '':
+            yield line
+        else:
+            break
+
+
 
 class Seq:
     def __init__(self, id = '', seq = '', description = '', qual = ''):
@@ -113,7 +125,7 @@ def parse(f, dtype = 'fastq'):
     seq = Seq()
     output = []
     #for i in f:
-    for i in readline(f):
+    for i in readline_mmap(f):
         #print 'seq is', i
         if len(output) == 4:
             #seq.id, seq.seq, seq.description, seq.qual = output
@@ -145,10 +157,11 @@ def k2n(s, scale = 4, code = code):
     if scale == -1:
         #scale = code.max() + 1
         scale = max(code) + 1
+    n = len(s)
     N = 0
     output = 0
     #for i in s[::-1]:
-    for c in xrange(len(s) - 1, -1, -1):
+    for c in xrange(n - 1, -1, -1):
         i = s[c]
         #print 'char', c, i, len(s), code[ord(i)]
         output += code[ord(i)] * int(pow(scale, N))
@@ -616,6 +629,8 @@ def run(n, qry):
         print 'test seq2n'
         #print [nb for nb in seq2n(seq0.seq)]
         kmc(seq0.seq, buck[0], ksize, scale)
+        kmc(seq1.seq, buck[0], ksize, scale)
+
 
     f0.close()
     f1.close()
@@ -652,7 +667,7 @@ def entry_point(argv):
     print 'D2 shape', len(d2), len(d2[1])
     del d2;
     gc.collect()
-    #buck = fq2c(argv[1:])
+    buck = fq2c(argv[1:])
     return 0
 
 def target(*args):
