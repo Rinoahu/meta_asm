@@ -648,9 +648,11 @@ def entry_point(argv):
     #y = range(32, 64)
     #run(x, y, K)
     #run(K, qry)
-    buck = fq2c(argv[1:])
-    #for n0, n1 in zip([1,2,3], [2,3,4]):
-    #    print 'n0', 'n1', n0, n1
+    d2 = [[r_ushort(1)] * K, [r_ushort(4), r_ushort(4)] * K]
+    print 'D2 shape', len(d2), len(d2[1])
+    del d2;
+    gc.collect()
+    #buck = fq2c(argv[1:])
     return 0
 
 def target(*args):
