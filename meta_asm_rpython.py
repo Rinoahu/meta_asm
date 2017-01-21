@@ -5,14 +5,14 @@
 # CreateTime: 2017-01-13 15:34:46
 
 #from array import array
-from math import sqrt, erf, exp, pow
+from math import sqrt, erf, exp, pow, log
 import math
 import itertools
 #from itertools import izip
 from random import random
 from rpython.rlib import rrandom
 from rpython.rlib.rfloat import erfc
-from rpython.rtyper.lltypesystem.rffi import r_ushort #r_uint, r_int_fast64_t
+from rpython.rtyper.lltypesystem.rffi import r_ushort, r_int
 from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint
 from rpython.rlib import rfile
 from rpython.rlib import rmmap
@@ -20,6 +20,7 @@ from rpython.rlib.listsort import TimSort
 #from struct import pack
 from time import time
 import gc
+from heapq import heappush, heappop, heapreplace, heapify
 
 # quicksort
 def qsort(x, y, k = 10):
@@ -29,6 +30,10 @@ def qsort(x, y, k = 10):
             xi, xj = x[i], x[j]
             if y[xi: xi + k] > y[xj: xj + k]:
                 x[i], x[j] = x[j], x[i]
+
+
+
+
 
 
 # map function
@@ -102,7 +107,6 @@ def readline_mmap(f):
             yield line
         else:
             break
-
 
 
 class Seq:
@@ -295,8 +299,6 @@ def fq2c(qry):
 
 
 
-
-
 # cdf of normal distribution
 ncdf = lambda x : erfc(-x / 1.4142135623730951) / 2
 
@@ -308,6 +310,18 @@ def sum(x):
     for i in x:
         flag += i
         #a.append(i)
+    return flag
+# max or min
+def max(x):
+    flag = float('-inf')
+    for i in x:
+        flag = flag < i and i or flag
+    return flag
+
+def max(x):
+    flag = float('-inf')
+    for i in x:
+        flag = flag > i and i or flag
     return flag
 
 
@@ -363,7 +377,6 @@ tiecorrect = lambda ts, n: ts and 1 - sum([pow(t, 3) - t for t in ts]) / (pow(n,
 # return the z score of U
 #def mannwhitneyu(x, y, use_continuity = True, alternative = 'two-sided'):
 def mannwhitneyu(x, y, use_continuity = True):
-
     #n0, n1 = map(len, [x, y])
     n0, n1 = len(x), len(y)
     n = n0 + n1
@@ -433,6 +446,8 @@ def mannwhitneyu(x, y, use_continuity = True):
 
     return u, p
 
+# comp of mann
+mannwhitneyu_c = lambda x, y: 1 - mannwhitneyu([intmask(elem) for elem in x], [intmask(elem) for elem in y])[1]
 
 # the euclidean distance
 def euclidean(x, y):
@@ -468,12 +483,202 @@ def pearson(x, y):
         return b == c and 1. or 0.
 
 
+# update centroid
+acentroid = lambda cx, x, cy, y: [cx * x[elem] + cy * y[elem] for elem in xrange(len(x))]
+# find the centroid
+def centroid(X, L = []):
+    if len(L) == 0:
+        L = range(len(X))
+
+    N = len(L)
+    x = X[L[0]]
+    n = 1
+    for i in xrange(N):
+        y = X[L[i]]
+        n += 1
+        cy = 1. / n
+        cx = 1 - cy
+        acentroid(cx, x, cy, y)
+
+    return x
+
+# online kmean
+def kmean(X, eps = .8, itr = 25):
+    # C store the cenoid
+    #Cs = X[::len(X)//30]
+    Cs = X[:30]
+    # N stroe the count of each cenoid
+    Ns = [1] * 30
+    for i in xrange(itr):
+        for x in X:
+            if Cs:
+                P, idx, y = 0, -1, x
+                #P, idx = 0, -1
+                for j in xrange(len(Cs)):
+                    v = Cs[j]
+                    u, p = mannwhitneyu(x, v)
+                    if eps < p > P:
+                        P, idx, y = p, j, v
+
+                if idx == -1:
+                    #Cs.append(x)
+                    #Ns.append(1)
+                    continue
+                else:
+                    print 'adjust centroid'
+                    N = Ns[idx]
+                    cy = 1. / (N + 1)
+                    cx = 1 - cy
+                    Cs[idx] = acentroid(cx, x, cy, y)
+                    Ns[idx] += 1
+            else:
+                Cs.append(x)
+                Ns.append(1)
+
+
+            #print 'Number of cluster', len(Cs)
+    #print 'size of Cs', len(Cs)
+    flag = 0
+    for x in X:
+        for y in Cs:
+            u, p = mannwhitneyu(x, y)
+            if p > eps:
+                flag += 1
+                break
+    print 'classifiled point', flag
+    return Cs
+    #return flag
+
+
+
+# the dbscan algorithm
+def neighbor0(pt, uncluster, noise, x, eps = .8, minpts = 5, dist = mannwhitneyu):
+    seed, new_uncluster, new_noise = [], [], []
+    while uncluster:
+        i = uncluster.pop()
+        ptu = x[i]
+        PT = map(intmask, pt)
+        u, p = mannwhitneyu(PT, map(intmask, ptu))
+        #print 'p is', p
+        if p >= eps:
+            seed.append(i)
+        else:
+            #print 'cluster add', p
+            new_uncluster.append(i)
+
+    while noise:
+        i = noise.pop()
+        ptn = x[i]
+        PT = map(intmask, pt)
+        u, p = mannwhitneyu(PT, map(intmask, ptn))
+        #print 'p is', p
+        #if mannwhitneyu(pt, ptn) >= eps:
+        if p >= eps:
+            seed.append(i)
+        else:
+            #print 'noise add', p
+            new_noise.append(i)
+
+    #print 'find neighbor', len(seed), len(new_uncluster), len(new_noise)
+    return seed, new_uncluster, new_noise
+
+
+def dbscan0(x, eps = .9, minpts = 3, dist = mannwhitneyu):
+    n = len(x)
+    uncluster, noise, cluster = [r_int(elem) for elem in xrange(n)], [], []
+    flag = 0
+    while uncluster:
+        i = uncluster.pop()
+        ptl = x[i]
+        seed, uncluster, noise = neighbor(ptl, uncluster, noise, x, eps, minpts, dist)
+
+        #print 'call nn', flag
+        flag += 1
+
+        if len(seed) >= minpts:
+            current = [i]
+            while seed:
+                last = seed.pop()
+                current.append(last)
+                ptl = x[last]
+                sub_seed, uncluster, noise = neighbor(ptl, uncluster, noise, x, eps, minpts - 1, dist)
+
+                #print 'call nn', flag
+                flag += 1
+
+                seed.extend(sub_seed)
+
+            cluster.append(current)
+
+        else:
+            noise.append(i)
+
+    return cluster, noise
+
+# dbscan algorithm
+def regionQuery(p, D, eps):
+    n = len(D)
+    P = D[p]
+    neighbor = []
+    for i in xrange(n):
+        u, p = mannwhitneyu(P, D[i])
+        if p >= eps:
+            neighbor.append(i)
+
+    return neighbor
+
+def expendCluster(i, NeighborPts, D, L, C, eps, MinPts):
+    P = D[i]
+    L[i] = C
+    visit = {}
+    for j in NeighborPts:
+        visit[j] = 'y'
+    for j in NeighborPts:
+        if j in visit:
+            continue
+        else:
+            visit[j] = 'y'
+        if L[j] == 0:
+            jNeighborPts = regionQuery(j, D, eps)
+            #print 'inner Neighbor Pts size is', len(NeighborPtsi)
+            if len(jNeighborPts) >= MinPts:
+                #NeighborPts.extend(NeighborPtsi)
+                for k in jNeighborPts:
+                    if k not in visit:
+                        NeighborPts.append(k)
+                        visit[k] = 'y'
+        if L[j] <= 0:
+            L[j] = C
+    print 'visit label', len(visit)
+
+# < 0: noise
+# = 0: unclassified, unvisitied
+# > 0: classified
+def dbscan(D, eps = .5, MinPts = 3, dist = mannwhitneyu):
+    n = len(D)
+    C = 0
+    # label to record the type of point
+    L = [0] * n
+    for i in xrange(n):
+        # if point i is visited, then pass
+        if L[i] != 0:
+            continue
+        NeighborPts = regionQuery(i, D, eps)
+        print 'Neighbor Pts size is', len(NeighborPts)
+        if len(NeighborPts) < MinPts:
+            L[i] = -1
+        else:
+            C += 1
+            expendCluster(i, NeighborPts, D, L, C, eps, MinPts)
+
+    return L
+
 
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
 #def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
-def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
+def canopy(data, t1 = .4, t2 = .2, dist = mannwhitneyu_c):
 #def canopy(data, t1 = 0, t2 = 1e-3, dist = pearson):
 
     canopies = []
@@ -492,7 +697,7 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
     flag = 0
     while idxs:
         idx = idxs.pop()
-        #x = [intmask(val) for val in data[idx]]
+        #x = [intmask(int(val)) for val in data[idx]]
         x = map(intmask, data[idx])
 
         can = [idx]
@@ -534,6 +739,7 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
 
 
         else:
+            print 'mann_c'
             for elem in idxs:
             #while idxs:
                 #elem = idxs.pop()
@@ -545,6 +751,7 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
                     can.append(elem)
                 if d > t2:
                     keep.append(elem)
+            print 'reduce point', len(idxs) - len(keep) 
 
         # use -1 as sep and save to disk
         can.append(-1)
@@ -555,7 +762,7 @@ def canopy(data, t1 = .2, t2 = .6, dist = mannwhitneyu):
             canopies = []
         #canopies.write(string)
         #print 'can size', len(can), len(keep)
-        print 'can size', len(can), len(keep), len(canopies)
+        #print 'can size', len(can), 'reduce', len(idxs) - len(keep), len(canopies)
         #del x, can, idxs
         idxs = keep
         #del keep
@@ -600,7 +807,7 @@ def run(n, qry):
         #    y[j] = rg.random()
         #x = [rg.random() for elem in xrange(32)]
         #y = [rg.random() for elem in xrange(32)]
-        x = [intmask(elem) for elem in [r_ushort(0)] * 32]
+        #x = [intmask(elem) for elem in [r_ushort(0)] * 32]
         #x = map(intmask, [0] * 32)
         y = [intmask(elem) for elem in xrange(32)]
         #rgs = range(32)
@@ -648,26 +855,152 @@ def run(n, qry):
     return 1
     '''
 
+
+# multiple child node
+class Node:
+    def __init__(self, key, data, level = 0):
+        self.level = level
+        self.key = key
+        self.data = data
+        self.child = []
+
+# cover tree
+class Cvt:
+    def __init__(self, x, eps = .01, dist = mannwhitneyu_c):
+
+        self.dist = dist
+        self.root = Node(x[0], x, 0)
+        self.eps = eps
+        radius = -1
+        flag = 0
+        for i in xrange(1, len(x)):
+            current = self.dist(x[0], x[i])
+            radius = current > radius and current or radius
+            flag += current <.2 and 1 or 0
+
+        print 'at least < .2 half', flag
+        self.radius = radius
+        #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
+        #self.maxlevel = log(12, 2)
+
+
+    def fit(self):
+
+        nodes = [self.root]
+        while nodes:
+            n0 = nodes.pop()
+            level = n0.level + 1
+            radius = self.radius / pow(2, level)
+            if radius > self.eps and len(n0.data) > 1:
+                flag = 0
+                print 'first x data', n0.key
+                for vtx in self.split(n0.data, radius):
+                    print 'split set size', len(vtx), 'level', level, 'radius', radius, 'self radius', self.radius
+                    n1 = Node(vtx[0], vtx, level)
+                    n0.child.append(n1)
+                    nodes.append(n1)
+                    flag += 1
+                print 'split', flag, 'child length', len(n0.child)
+            else:
+                print 'not split'
+
+    # setup root
+    def split(self, data, radius):
+
+        while data:
+            data[0], data[-1] = data[-1], data[0]
+            x = data.pop()
+            inner, outer = [x], []
+            while data:
+                y = data.pop()
+                if self.dist(x, y) <= radius:
+                #if 1:
+                    inner.append(y)
+                else:
+                    outer.append(y)
+
+            #print 'inner set size', len(inner)
+            yield inner
+            data = outer
+
+
+
+
+
+
 def entry_point(argv):
     try:
         K = int(argv[1])
     except:
         K = 10
 
-    qry = argv[2]
+    qry = float(argv[2])
 
-    fac = lambda x: sum(range(x))
-    print fac(K)
+    #fac = lambda x: sum(range(x))
+    #print fac(K)
 
     #x = range(32)
     #y = range(32, 64)
     #run(x, y, K)
     #run(K, qry)
-    d2 = [[r_ushort(1)] * K, [r_ushort(4), r_ushort(4)] * K]
-    print 'D2 shape', len(d2), len(d2[1])
-    del d2;
+    rg = rrandom.Random()
+    d1 = []
+    for i in xrange(K):
+        #b = [int(rg.random() * pow(2, 15) - 1) for elem0 in xrange(32)]
+        b = [(rg.random() - .5) * 2 + i % 10 * qry for elem0 in xrange(32)]
+        TimSort(b).sort()
+        #d1.append([r_ushort(elem) for elem in b])
+        d1.append(b)
+
+    Tree = Cvt(d1)
+    Tree.fit()
+
+    #canopy(d1)
+
+    #print centroid(d1)
+    #d1 = [[intmask(1)] * 64 for elem in xrange(K)]
+    #cluster, noise = dbscan(d1)
+    #print 'cluster size', len(cluster), len(cluster[0]), len(noise)
+    #label = dbscan(d1)
+    #flag = 0
+    #for i in label:
+    #    flag = flag < i and i or flag
+    #print flag
+    #aset = {}
+    #aset[0] = 1
+    #print kmean(d1)
+
+    #d2 = [r_ushort(1)] * K
+    #d3 = []
+    #while d2:
+    #    d3.append(d2.pop())
+
+    #print 'print before extend d3', len(d3)
+    #d3.extend(d3[:5])
+    #print 'print after d3', len(d3)
+    #d2.append(['abc'])
+    #print 'pop last', intmask(d3.pop())
+    #d2 = [[r_ushort(1)] * K, [r_ushort(4), r_ushort(4)] * K]
+    #print 'D2 shape', len(d2), len(d2[1])
+    #del d2;
+    #a = [1, 2, 3 ,4]
+    #heappop(a)
     gc.collect()
-    buck = fq2c(argv[1:])
+    #buck = fq2c(argv[1:])
+    '''
+    root = Node([1, 2, 3], 0)
+    point = root
+    for i in xrange(1, K):
+        child = node([1], point.level + 1)
+        point.child.append(child)
+        point = child
+
+    point = root
+    while point.child:
+        point = point.child[0]
+
+    print point.level
+    '''
     return 0
 
 def target(*args):
