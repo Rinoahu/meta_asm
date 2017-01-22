@@ -777,6 +777,121 @@ def canopy(data, t1 = .4, t2 = .2, dist = mannwhitneyu_c):
     return canopies
 
 
+# multiple child node
+class Node:
+    def __init__(self, key, rank, level = 0):
+        self.level = level
+        self.key = key
+        self.rank = rank
+        self.child = []
+
+# cover tree
+class Cvt:
+    def __init__(self, data, eps = .05, dist = mannwhitneyu_c):
+
+        self.data = data
+        self.eps = eps / 2.
+        self.scale = 0.618
+        self.dist = dist
+        n = len(data)
+        self.root = Node(0, range(n), 0)
+        radius = -1
+        flag = 0
+        x = 0
+        for y in xrange(1, n):
+            current = self.dist(data[x], data[y])
+            radius = current > radius and current or radius
+            flag += current < self.scale and 1 or 0
+
+        print 'at least < .618 half', flag
+        self.radius = radius
+        #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
+        #self.maxlevel = log(12, 2)
+
+
+    def fit(self):
+
+        nodes = [self.root]
+        scale = self.scale
+        while nodes:
+            n0 = nodes.pop()
+            level = n0.level + 1
+            radius = self.radius * pow(scale, level)
+            if radius > self.eps and len(n0.rank) > 1:
+                flag = 0
+                print 'first x data', n0.key
+                for rank in self.split(n0.rank, radius):
+                    print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
+                    n1 = Node(rank[0], rank, level)
+                    n0.child.append(n1)
+                    nodes.append(n1)
+                    flag += 1
+                print 'split', flag, 'child length', len(n0.child)
+            else:
+                print 'not split'
+
+    # setup root
+    def split(self, rank, radius):
+        data = self.data
+        while rank:
+            rank[0], rank[-1] = rank[-1], rank[0]
+            x = rank.pop()
+            inner, outer = [x], []
+            while rank:
+                y = rank.pop()
+                if self.dist(data[x], data[y]) <= radius:
+                #if 1:
+                    inner.append(y)
+                else:
+                    outer.append(y)
+
+            #print 'inner set size', len(inner)
+            yield inner
+            rank = outer
+
+    # dfs get all leaves's data by give an inner node
+    def leaf(self, n):
+        nodes = [n]
+        ranks = []
+        while nodes:
+            node = nodes.pop()
+            if node.child:
+                nodes.extend(node.child)
+            else:
+                ranks.extend(node.rank)
+
+        return ranks
+
+    # query nearest point
+    def query(self, x, err = 1e-2):
+        scale = self.scale
+        data = self.data
+        stack = [self.root]
+        print 'root scale and level', scale, self.root.level
+        #res = []
+        ranks = []
+        # find all the node, which overlap with x
+        while stack:
+            node = stack.pop()
+            level = node.level
+            radius = self.radius * pow(scale, level)
+            y = node.key
+            z = self.dist(x, data[y])
+            if z <= err:
+                ranks.append(node.key)
+            if z <= radius:
+                print 'z', z, 'err', err, 'radius', self.radius, 'level', level, 'current radius', radius, 'cand', len(node.child[1: ])
+
+                stack.extend(node.child[1: ])
+            else:
+                continue
+
+        #for i in res:
+        #    ranks.extend(self.leaf(i))
+
+        return ranks
+
+
 #def run(x, y, n):
 def run(n, qry):
     ksize = max(2, n)
@@ -854,81 +969,6 @@ def run(n, qry):
     '''
 
 
-# multiple child node
-class Node:
-    def __init__(self, key, rank, level = 0):
-        self.level = level
-        self.key = key
-        self.rank = rank
-        self.child = []
-
-# cover tree
-class Cvt:
-    def __init__(self, data, eps = .01, dist = mannwhitneyu_c):
-
-        self.data = data
-        self.eps = eps
-        self.scale = 0.618
-        self.dist = dist
-        n = len(data)
-        self.root = Node(0, range(n), 0)
-        radius = -1
-        flag = 0
-        x = 0
-        for y in xrange(1, n):
-            current = self.dist(data[x], data[y])
-            radius = current > radius and current or radius
-            flag += current < self.scale and 1 or 0
-
-        print 'at least < .618 half', flag
-        self.radius = radius
-        #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
-        #self.maxlevel = log(12, 2)
-
-
-    def fit(self):
-
-        nodes = [self.root]
-        scale = self.scale
-        while nodes:
-            n0 = nodes.pop()
-            level = n0.level + 1
-            radius = self.radius * pow(scale, level)
-            if radius > self.eps and len(n0.rank) > 1:
-                flag = 0
-                print 'first x data', n0.key
-                for rank in self.split(n0.rank, radius):
-                    print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
-                    n1 = Node(rank[0], rank, level)
-                    n0.child.append(n1)
-                    nodes.append(n1)
-                    flag += 1
-                print 'split', flag, 'child length', len(n0.child)
-            else:
-                print 'not split'
-
-    # setup root
-    def split(self, rank, radius):
-        data = self.data
-        while rank:
-            rank[0], rank[-1] = rank[-1], rank[0]
-            x = rank.pop()
-            inner, outer = [x], []
-            while rank:
-                y = rank.pop()
-                if self.dist(data[x], data[y]) <= radius:
-                #if 1:
-                    inner.append(y)
-                else:
-                    outer.append(y)
-
-            #print 'inner set size', len(inner)
-            yield inner
-            rank = outer
-
-
-
-
 
 
 def entry_point(argv):
@@ -962,6 +1002,9 @@ def entry_point(argv):
 
     Tree = Cvt(d1)
     Tree.fit()
+    print Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
+    print [mannwhitneyu_c(d1[0], d1[elem]) for elem in Tree.query(d1[0])]
+
 
     #canopy(d1)
 
