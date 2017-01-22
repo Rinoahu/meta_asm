@@ -1009,9 +1009,14 @@ def entry_point(argv):
 
     Tree = Cvt(d1)
     Tree.fit()
-    for y in d1[:1000]:
+    qry = int(qry)
+    if qry < 0:
+        qry = 0
+    for y in d1[: qry]:
         #print Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
         print Tree.query(y)
+        #for x in d1:
+        #    mannwhitneyu_c(x, y)
 
     #test = [mannwhitneyu_c(d1[0], y) for y in d1]
     #print 'real', [elem for elem in test if elem <= 1e-2]
