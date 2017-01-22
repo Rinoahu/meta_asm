@@ -32,10 +32,6 @@ def qsort(x, y, k = 10):
                 x[i], x[j] = x[j], x[i]
 
 
-
-
-
-
 # map function
 def map(fuc, arr):
     #n = len(arr)
@@ -437,7 +433,7 @@ def mannwhitneyu(x, y, use_continuity = True):
     var = n0 * n1 * (n + 1) * tiecorrect(ts, n) / 12.
     #sd = var ** .5
     sd = pow(var, .5)
-    z = use_continuity and abs(u - mu) - .5 / sd or abs(u - mu) / sd
+    z = use_continuity and (abs(u - mu) - .5) / sd or abs(u - mu) / sd
 
     if z >= 0:
         p = 2 - 2 * ncdf(z)
@@ -447,7 +443,9 @@ def mannwhitneyu(x, y, use_continuity = True):
     return u, p
 
 # comp of mann
-mannwhitneyu_c = lambda x, y: 1 - mannwhitneyu([intmask(elem) for elem in x], [intmask(elem) for elem in y])[1]
+#mannwhitneyu_c = lambda x, y: 1 - mannwhitneyu([intmask(elem) for elem in x], [intmask(elem) for elem in y])[1]
+mannwhitneyu_c = lambda x, y: 1 - mannwhitneyu(x, y)[1]
+
 
 # the euclidean distance
 def euclidean(x, y):
@@ -858,27 +856,31 @@ def run(n, qry):
 
 # multiple child node
 class Node:
-    def __init__(self, key, data, level = 0):
+    def __init__(self, key, rank, level = 0):
         self.level = level
         self.key = key
-        self.data = data
+        self.rank = rank
         self.child = []
 
 # cover tree
 class Cvt:
-    def __init__(self, x, eps = .01, dist = mannwhitneyu_c):
+    def __init__(self, data, eps = .01, dist = mannwhitneyu_c):
 
-        self.dist = dist
-        self.root = Node(x[0], x, 0)
+        self.data = data
         self.eps = eps
+        self.scale = 0.618
+        self.dist = dist
+        n = len(data)
+        self.root = Node(0, range(n), 0)
         radius = -1
         flag = 0
-        for i in xrange(1, len(x)):
-            current = self.dist(x[0], x[i])
+        x = 0
+        for y in xrange(1, n):
+            current = self.dist(data[x], data[y])
             radius = current > radius and current or radius
-            flag += current <.2 and 1 or 0
+            flag += current < self.scale and 1 or 0
 
-        print 'at least < .2 half', flag
+        print 'at least < .618 half', flag
         self.radius = radius
         #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
         #self.maxlevel = log(12, 2)
@@ -887,16 +889,17 @@ class Cvt:
     def fit(self):
 
         nodes = [self.root]
+        scale = self.scale
         while nodes:
             n0 = nodes.pop()
             level = n0.level + 1
-            radius = self.radius / pow(2, level)
-            if radius > self.eps and len(n0.data) > 1:
+            radius = self.radius * pow(scale, level)
+            if radius > self.eps and len(n0.rank) > 1:
                 flag = 0
                 print 'first x data', n0.key
-                for vtx in self.split(n0.data, radius):
-                    print 'split set size', len(vtx), 'level', level, 'radius', radius, 'self radius', self.radius
-                    n1 = Node(vtx[0], vtx, level)
+                for rank in self.split(n0.rank, radius):
+                    print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
+                    n1 = Node(rank[0], rank, level)
                     n0.child.append(n1)
                     nodes.append(n1)
                     flag += 1
@@ -905,15 +908,15 @@ class Cvt:
                 print 'not split'
 
     # setup root
-    def split(self, data, radius):
-
-        while data:
-            data[0], data[-1] = data[-1], data[0]
-            x = data.pop()
+    def split(self, rank, radius):
+        data = self.data
+        while rank:
+            rank[0], rank[-1] = rank[-1], rank[0]
+            x = rank.pop()
             inner, outer = [x], []
-            while data:
-                y = data.pop()
-                if self.dist(x, y) <= radius:
+            while rank:
+                y = rank.pop()
+                if self.dist(data[x], data[y]) <= radius:
                 #if 1:
                     inner.append(y)
                 else:
@@ -921,7 +924,7 @@ class Cvt:
 
             #print 'inner set size', len(inner)
             yield inner
-            data = outer
+            rank = outer
 
 
 
@@ -947,10 +950,15 @@ def entry_point(argv):
     d1 = []
     for i in xrange(K):
         #b = [int(rg.random() * pow(2, 15) - 1) for elem0 in xrange(32)]
-        b = [(rg.random() - .5) * 2 + i % 10 * qry for elem0 in xrange(32)]
+        #b = [int(((rg.random() - .5) * 2 + i % 10) * 10) for elem0 in xrange(32)]
+        b = [rg.random() for elem0 in xrange(32)]
+
         TimSort(b).sort()
         #d1.append([r_ushort(elem) for elem in b])
         d1.append(b)
+
+    test = [mannwhitneyu_c(d1[0], elem) for elem in d1[1: ]]
+    print 'pass test', sum([elem < .618 and 1 or 0 for elem in test])
 
     Tree = Cvt(d1)
     Tree.fit()
