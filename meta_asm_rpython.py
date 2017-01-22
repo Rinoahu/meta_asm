@@ -819,22 +819,23 @@ class Cvt:
             radius = self.radius * pow(scale, level)
             if radius > self.eps and len(n0.rank) > 1:
                 flag = 0
-                print 'first x data', n0.key
+                #print 'first x data', n0.key
                 for rank in self.split(n0.rank, radius):
-                    print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
+                    #print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
                     n1 = Node(rank[0], rank, level)
                     n0.child.append(n1)
                     nodes.append(n1)
                     flag += 1
-                print 'split', flag, 'child length', len(n0.child)
+                #print 'split', flag, 'child length', len(n0.child)
             else:
-                print 'not split'
+                #print 'not split'
+                continue
 
     # setup root
     def split(self, rank, radius):
+        rank[0], rank[-1] = rank[-1], rank[0]
         data = self.data
         while rank:
-            rank[0], rank[-1] = rank[-1], rank[0]
             x = rank.pop()
             inner, outer = [x], []
             while rank:
@@ -867,29 +868,32 @@ class Cvt:
         scale = self.scale
         data = self.data
         stack = [self.root]
-        print 'root scale and level', scale, self.root.level
+        #print 'root scale and level', scale, self.root.level
         #res = []
         ranks = []
         # find all the node, which overlap with x
         while stack:
             node = stack.pop()
+            #key = node.key
             level = node.level
-            radius = self.radius * pow(scale, level)
-            y = node.key
-            z = self.dist(x, data[y])
-            if z <= err:
-                ranks.append(node.key)
-            if z <= radius:
-                print 'z', z, 'err', err, 'radius', self.radius, 'level', level, 'current radius', radius, 'cand', len(node.child[1: ])
-
-                stack.extend(node.child[1: ])
-            else:
+            y = data[node.key]
+            d = self.dist(x, y)
+            r = self.radius * pow(scale, level)
+            #print 'stack length', len(stack)
+            if err + r < d:
+                #print ' no, overlap', 'key', key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child]
                 continue
+            else:
+                #print 'yes, overlap', 'key', key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child]
+                stack.extend(node.child)
+                if d <= err and len(node.child) == 0:
+                    print 'find point', node.key
+                    #ranks.append(key)
+                    ranks.extend(node.rank)
 
-        #for i in res:
-        #    ranks.extend(self.leaf(i))
+        #print 'all leaves', len(self.leaf(self.root))
 
-        return ranks
+        return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
 
 
 #def run(x, y, n):
@@ -998,12 +1002,20 @@ def entry_point(argv):
         d1.append(b)
 
     test = [mannwhitneyu_c(d1[0], elem) for elem in d1[1: ]]
-    print 'pass test', sum([elem < .618 and 1 or 0 for elem in test])
+    print 'pass test', sum([elem < 1e-2 and 1 or 0 for elem in test])
+
+    tmp = [1]
+    print 'tmp index', tmp[1: ]
 
     Tree = Cvt(d1)
     Tree.fit()
-    print Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
-    print [mannwhitneyu_c(d1[0], d1[elem]) for elem in Tree.query(d1[0])]
+    for y in d1[:1000]:
+        #print Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
+        print Tree.query(y)
+
+    #test = [mannwhitneyu_c(d1[0], y) for y in d1]
+    #print 'real', [elem for elem in test if elem <= 1e-2]
+    print 'real', [[elem, mannwhitneyu_c(d1[0], d1[elem])] for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= 1e-2]
 
 
     #canopy(d1)
