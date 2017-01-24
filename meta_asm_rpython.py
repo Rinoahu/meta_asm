@@ -308,16 +308,10 @@ def sum(x):
         #a.append(i)
     return flag
 # max or min
-def max(x):
+def Max(x):
     flag = float('-inf')
     for i in x:
         flag = flag < i and i or flag
-    return flag
-
-def max(x):
-    flag = float('-inf')
-    for i in x:
-        flag = flag > i and i or flag
     return flag
 
 
@@ -372,7 +366,7 @@ tiecorrect = lambda ts, n: ts and 1 - sum([pow(t, 3) - t for t in ts]) / (pow(n,
 # Mann–Whitney U test
 # return the z score of U
 #def mannwhitneyu(x, y, use_continuity = True, alternative = 'two-sided'):
-def mannwhitneyu(x, y, use_continuity = True):
+def mannwhitneyu(x, y, use_continuity = False):
     #n0, n1 = map(len, [x, y])
     n0, n1 = len(x), len(y)
     n = n0 + n1
@@ -625,7 +619,10 @@ def regionQuery(p, D, eps):
 
     return neighbor
 
-def expendCluster(i, NeighborPts, D, L, C, eps, MinPts):
+#regionQuery = lambda p, D, Dtree, eps: Dtree.query(D[p], eps)
+
+
+def expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
     P = D[i]
     L[i] = C
     visit = {}
@@ -637,7 +634,9 @@ def expendCluster(i, NeighborPts, D, L, C, eps, MinPts):
         else:
             visit[j] = 'y'
         if L[j] == 0:
-            jNeighborPts = regionQuery(j, D, eps)
+            #jNeighborPts = regionQuery(j, D, eps)
+            jNeighborPts = Dtree.query(D[j], eps)
+
             #print 'inner Neighbor Pts size is', len(NeighborPtsi)
             if len(jNeighborPts) >= MinPts:
                 #NeighborPts.extend(NeighborPtsi)
@@ -652,7 +651,8 @@ def expendCluster(i, NeighborPts, D, L, C, eps, MinPts):
 # < 0: noise
 # = 0: unclassified, unvisitied
 # > 0: classified
-def dbscan(D, eps = .5, MinPts = 3, dist = mannwhitneyu):
+def dbscan(D, eps = .1, MinPts = 3, dist = mannwhitneyu_c):
+    Dtree = Cvt(D)
     n = len(D)
     C = 0
     # label to record the type of point
@@ -661,13 +661,18 @@ def dbscan(D, eps = .5, MinPts = 3, dist = mannwhitneyu):
         # if point i is visited, then pass
         if L[i] != 0:
             continue
-        NeighborPts = regionQuery(i, D, eps)
-        print 'Neighbor Pts size is', len(NeighborPts)
+        #NeighborPts = regionQuery(i, D, Dtree, eps)
+        NeighborPts = Dtree.query(D[i], eps)
+        print 'Neighbor Pts size is', len(NeighborPts), i, eps
+        if len(NeighborPts) == 100000:
+            #print 'cover all point', [mannwhitneyu_c(D[i], D[elem]) for elem in xrange(n)]
+            print 'cover all point', Dtree.query(D[i], eps)
+
         if len(NeighborPts) < MinPts:
             L[i] = -1
         else:
             C += 1
-            expendCluster(i, NeighborPts, D, L, C, eps, MinPts)
+            expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts)
 
     return L
 
@@ -787,11 +792,12 @@ class Node:
 
 # cover tree
 class Cvt:
-    def __init__(self, data, eps = .05, dist = mannwhitneyu_c):
+    def __init__(self, data, eps = 5e-5, dist = mannwhitneyu_c):
 
         self.data = data
-        self.eps = eps / 2.
-        self.scale = 0.618
+        #self.eps = eps / 2.
+        self.eps = eps
+        self.scale = .2
         self.dist = dist
         n = len(data)
         self.root = Node(0, range(n), 0)
@@ -803,7 +809,7 @@ class Cvt:
             radius = current > radius and current or radius
             flag += current < self.scale and 1 or 0
 
-        print 'at least < .618 half', flag
+        print 'at least half', flag, self.scale
         self.radius = radius
         #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
         #self.maxlevel = log(12, 2)
@@ -817,7 +823,8 @@ class Cvt:
             n0 = nodes.pop()
             level = n0.level + 1
             radius = self.radius * pow(scale, level)
-            if radius > self.eps and len(n0.rank) > 1:
+
+            if radius > self.eps and len(n0.rank) > 0:
                 flag = 0
                 #print 'first x data', n0.key
                 for rank in self.split(n0.rank, radius):
@@ -826,7 +833,9 @@ class Cvt:
                     n0.child.append(n1)
                     nodes.append(n1)
                     flag += 1
+
                 #print 'split', flag, 'child length', len(n0.child)
+
             else:
                 #print 'not split'
                 continue
@@ -863,8 +872,28 @@ class Cvt:
 
         return ranks
 
+    # for debug
+    def root_leaf(self):
+        p = self.root
+        while len(p.child) > 0:
+            p = [elem for elem in p.child if elem.key == 0][0]
+
+        #return p.rank, p.level, self.radius * pow(self.scale, p.level)
+        flag = 0
+        for i in p.rank:
+            if mannwhitneyu_c(self.data[0], self.data[i]) > self.radius * pow(self.scale, p.level):
+                flag += 1
+        return flag, self.radius * pow(self.scale, p.level)
+
+
+
+
     # query nearest point
     def query(self, x, err = 1e-2):
+        #print '0 leaf', self.root_leaf()
+        #err = max(self.dist(x, x), err)
+        #print 'bias', err
+        #err -= self.eps
         scale = self.scale
         data = self.data
         stack = [self.root]
@@ -872,7 +901,9 @@ class Cvt:
         #res = []
         ranks = []
         # find all the node, which overlap with x
+        flag = 0
         while stack:
+            flag += 1
             node = stack.pop()
             #key = node.key
             level = node.level
@@ -880,21 +911,34 @@ class Cvt:
             d = self.dist(x, y)
             r = self.radius * pow(scale, level)
             #print 'stack length', len(stack)
-            if err + r < d:
-                #print ' no, overlap', 'key', key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child]
-                continue
-            else:
+            #print 'stack visit'
+            if d + r <= err:
+                ranks.extend(self.leaf(node))
+
+            elif d <= err + r:
                 #print 'yes, overlap', 'key', key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child]
                 stack.extend(node.child)
-                if d <= err and len(node.child) == 0:
-                    print 'find point', node.key
-                    #ranks.append(key)
-                    ranks.extend(node.rank)
+                # if node is leaf, then add to ranks list
+                if len(node.child) == 0:
+                    #print 'raidus size', r, d, err, node.key
+                    #if d + r <= err:
+                    if d <= err:
+                        ranks.extend(node.rank)
+                    #elif d <= err:
+                    #    ranks_flt = [elem for elem in node.rank if self.dist(x, data[elem]) <= err]
+                    #    ranks.extend(ranks_flt)
+                    #else:
+                    #    ranks.append(node.key)
 
+            #elif err < d < err + r:
+            #    stack.extend(node.child)
+            else:
+                continue
+
+        #print 'search times', flag
         #print 'all leaves', len(self.leaf(self.root))
-
-        return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
-
+        #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
+        return ranks
 
 #def run(x, y, n):
 def run(n, qry):
@@ -972,9 +1016,6 @@ def run(n, qry):
     return 1
     '''
 
-
-
-
 def entry_point(argv):
     try:
         K = int(argv[1])
@@ -1000,27 +1041,61 @@ def entry_point(argv):
         TimSort(b).sort()
         #d1.append([r_ushort(elem) for elem in b])
         d1.append(b)
+        #d1.append(b)
+    d1.extend(d1)
 
-    test = [mannwhitneyu_c(d1[0], elem) for elem in d1[1: ]]
-    print 'pass test', sum([elem < 1e-2 and 1 or 0 for elem in test])
+    idx = 1000
+    test = [mannwhitneyu_c(d1[idx], elem) for elem in d1]
+    flag = -1
+    for i in test:
+        if flag < i:
+            flag = i
+
+    print 'naive pass test', len([elem for elem in test if elem == 0]), len(test), flag
+
 
     tmp = [1]
     print 'tmp index', tmp[1: ]
 
     Tree = Cvt(d1)
+    t0 = time()
     Tree.fit()
+    print 'construct time', time() - t0
+    #test = Tree.query(d1[0])
+    test = [mannwhitneyu_c(d1[idx], d1[elem]) for elem in Tree.query(d1[idx])]
+    flag = -1
+    for i in test:
+        if flag < i:
+            flag = i
+    print 'cvt tree pass test', len([elem for elem in test if elem == 0]), len(test), flag#, Tree.query(d1[1])
+
+
     qry = int(qry)
     if qry < 0:
         qry = 0
+
+    t0 = time()
+    flag = 1
     for y in d1[: qry]:
-        #print Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
-        print Tree.query(y)
+        Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
         #for x in d1:
-        #    mannwhitneyu_c(x, y)
+        if flag % 10000 == 0:
+            out = Tree.query(y)
+            error = -1
+            for i in out:
+                err = mannwhitneyu_c(y, d1[i])
+                error = error < err and err or error
+
+            print 'query time', time() - t0, 'error', error, len(out)
+
+            t0 = time()
+        flag += 1
+
+#    mannwhitneyu_c(x, y)
 
     #test = [mannwhitneyu_c(d1[0], y) for y in d1]
     #print 'real', [elem for elem in test if elem <= 1e-2]
-    print 'real', [[elem, mannwhitneyu_c(d1[0], d1[elem])] for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= 1e-2]
+    #print 'real', [[elem, mannwhitneyu_c(d1[0], d1[elem])] for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= 1e-2]
 
 
     #canopy(d1)
