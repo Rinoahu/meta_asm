@@ -1085,6 +1085,10 @@ def entry_point(argv):
     #run(x, y, K)
     #run(K, qry)
     random = rrandom.Random().random
+    a = [random() for elem in xrange(int(qry))]
+    qsort(a, lambda x: -x)
+    print a[:10]
+
     t0 = time()
     d1 = []
     for i in xrange(K):
@@ -1096,7 +1100,7 @@ def entry_point(argv):
         #d1.append([r_ushort(elem) for elem in b])
         d1.append(b)
         #d1.append(b)
-    print 'after sorting', K, time() - t0
+    print 'after sorting', K, time() - t0, d1[0]
     d1[int(K) * 10]
     d1.extend(d1)
 
