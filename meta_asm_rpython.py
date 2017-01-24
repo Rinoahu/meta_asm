@@ -920,18 +920,9 @@ class Cvt:
                 stack.extend(node.child)
                 # if node is leaf, then add to ranks list
                 if len(node.child) == 0:
-                    #print 'raidus size', r, d, err, node.key
-                    #if d + r <= err:
                     if d <= err:
                         ranks.extend(node.rank)
-                    #elif d <= err:
-                    #    ranks_flt = [elem for elem in node.rank if self.dist(x, data[elem]) <= err]
-                    #    ranks.extend(ranks_flt)
-                    #else:
-                    #    ranks.append(node.key)
 
-            #elif err < d < err + r:
-            #    stack.extend(node.child)
             else:
                 continue
 
