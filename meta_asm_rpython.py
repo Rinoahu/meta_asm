@@ -17,19 +17,82 @@ from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint
 from rpython.rlib import rfile
 from rpython.rlib import rmmap
 from rpython.rlib.listsort import TimSort
+from rpython.rlib import listsort
 #from struct import pack
 from time import time
 import gc
 from heapq import heappush, heappop, heapreplace, heapify
 
-# quicksort
-def qsort(x, y, k = 10):
-    n = len(x)
-    for i in xrange(n):
-        for j in xrange(i + 1, n):
-            xi, xj = x[i], x[j]
-            if y[xi: xi + k] > y[xj: xj + k]:
-                x[i], x[j] = x[j], x[i]
+
+# define some constant number
+MIN = 7
+#MIN = 13
+MED = 23
+MAX = 41
+
+random = rrandom.Random(10).random
+
+# swap 2 selected elem in a list
+def swap(x, i, j):
+    x[i], x[j] = x[j], x[i]
+
+# in-place sort
+def insort(x, l, r, key = lambda x: x):
+    for i in xrange(l, r):
+        v = x[i]
+        pivot = key(v)
+        j = i - 1
+        while j >= l:
+            if key(x[j]) <= pivot:
+                break
+            x[j+1] = x[j]
+            j -= 1
+
+        x[j+1] = v
+
+# partition function of quicksort
+def partition(x, l, r, m, key = lambda x: x):
+    t = x[l]
+    pivot = key(t)
+    i, j = l, r + 1
+    while 1:
+        i += 1
+        while i <= r and key(x[i]) < pivot:
+            i += 1
+        j -= 1
+        while key(x[j]) > pivot:
+            j -= 1
+        if i > j:
+            break
+        swap(x, i, j)
+
+    swap(x, l, j)
+    return j
+
+# recursion version of quicksort
+def quicksort(x, l, r, key = lambda x: x):
+    if r <= l:
+        return
+    else:
+        gap = r - l + 1
+        if gap < MIN:
+            insort(x, l, r + 1, key)
+            return
+
+        elif MIN == gap:
+            m = l + gap // 2
+
+        else:
+            m = l + int(random() * gap)
+
+        swap(x, l, m)
+        med = partition(x, l, r, m, key)
+        quicksort(x, l, med - 1, key)
+        quicksort(x, med + 1, r, key)
+
+# the main function of qsort
+def qsort(x, key = lambda x: x):
+    quicksort(x, 0, len(x) - 1, key)
 
 
 # map function
@@ -541,8 +604,6 @@ def kmean(X, eps = .8, itr = 25):
     return Cs
     #return flag
 
-
-
 # the dbscan algorithm
 def neighbor0(pt, uncluster, noise, x, eps = .8, minpts = 5, dist = mannwhitneyu):
     seed, new_uncluster, new_noise = [], [], []
@@ -1007,6 +1068,7 @@ def run(n, qry):
     return 1
     '''
 
+
 def entry_point(argv):
     try:
         K = int(argv[1])
@@ -1022,17 +1084,20 @@ def entry_point(argv):
     #y = range(32, 64)
     #run(x, y, K)
     #run(K, qry)
-    rg = rrandom.Random()
+    random = rrandom.Random().random
+    t0 = time()
     d1 = []
     for i in xrange(K):
-        #b = [int(rg.random() * pow(2, 15) - 1) for elem0 in xrange(32)]
-        #b = [int(((rg.random() - .5) * 2 + i % 10) * 10) for elem0 in xrange(32)]
-        b = [rg.random() for elem0 in xrange(32)]
-
-        TimSort(b).sort()
+        #b = [int(random() * pow(2, 15) - 1) for elem0 in xrange(32)]
+        #b = [int(((random() - .5) * 2 + i % 10) * 10) for elem0 in xrange(32)]
+        b = [random() for elem0 in xrange(32)]
+        #TimSort(b).sort()
+        qsort(b)
         #d1.append([r_ushort(elem) for elem in b])
         d1.append(b)
         #d1.append(b)
+    print 'after sorting', K, time() - t0
+    d1[int(K) * 10]
     d1.extend(d1)
 
     idx = 1000
@@ -1047,6 +1112,11 @@ def entry_point(argv):
 
     tmp = [1]
     print 'tmp index', tmp[1: ]
+
+    alist = range(10 - 1, -1, -1)
+    print 'before sort', alist
+    qsort(alist, key = lambda x: x)
+    print ' after sort', alist
 
     Tree = Cvt(d1)
     t0 = time()
