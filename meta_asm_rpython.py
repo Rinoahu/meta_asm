@@ -947,10 +947,45 @@ class Cvt:
         return flag, self.radius * pow(self.scale, p.level)
 
 
+    # query nearest point
+    def query(self, x):
+        scale = self.scale
+        data = self.data
+        stack = [self.root]
+        #print 'root scale and level', scale, self.root.level
+        #res = []
+        rank = -1
+        D = 1000000000
+        # find all the node, which overlap with x
+        while stack:
+            node = stack.pop()
+            level = node.level
+            y = data[node.key]
+            d = self.dist(x, y)
+            if D > d:
+                #print 'reduce D'
+                rank, D = node.key, d
+
+            r = self.radius * pow(scale, level)
+            if d <= 0:
+                return [node.key]
+
+            elif 0 < d <= r:
+                stack.extend(node.child)
+
+            else:
+                continue
+
+        #print 'search times', flag
+        #print 'all leaves', len(self.leaf(self.root))
+        #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
+        return [rank]
+
+
 
 
     # query nearest point
-    def query(self, x, err = 1e-2):
+    def query_radius(self, x, err = 1e-2):
         #print '0 leaf', self.root_leaf()
         #err = max(self.dist(x, x), err)
         #print 'bias', err
@@ -1084,10 +1119,12 @@ def entry_point(argv):
     #y = range(32, 64)
     #run(x, y, K)
     #run(K, qry)
-    random = rrandom.Random().random
-    a = [random() for elem in xrange(int(qry))]
-    qsort(a, lambda x: -x)
-    print a[:10]
+
+    # test qsort
+    #random = rrandom.Random().random
+    #a = [random() for elem in xrange(int(qry))]
+    #qsort(a, lambda x: -x)
+    #print a[:10]
 
     t0 = time()
     d1 = []
@@ -1141,17 +1178,25 @@ def entry_point(argv):
 
     t0 = time()
     flag = 1
-    for y in d1[: qry]:
-        Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
+    #for y in d1[: qry]:
+    for i in xrange(qry):
+        y = d1[i]
+        #Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
+        out = Tree.query_radius(y, 1e-2)
+
         #for x in d1:
         if flag % 10000 == 0:
-            out = Tree.query(y)
-            error = -1
-            for i in out:
-                err = mannwhitneyu_c(y, d1[i])
-                error = error < err and err or error
+            error = 1000000000
+            idx = -1
+            for j in out:
+                err = mannwhitneyu_c(y, d1[j])
+                if err < error:
+                    error = err
+                print 'error and err', error, err, err < error and err or error
 
-            print 'query time', time() - t0, 'error', error, len(out)
+                idx = j
+
+            print 'query time', time() - t0, 'error', error, idx, out[:10], len(out)
 
             t0 = time()
         flag += 1
