@@ -130,7 +130,29 @@ def pack(dtype, val):
 
     return ''.join(string)
 
+# find the min of a list
+def Min(L):
+    n = len(L)
+    if n <= 1:
+        return 0
+    else:
+        flag = L[0]
+        for i in xrange(1, n):
+            flag = L[i] < flag and L[i] or flag
 
+    return flag
+
+# find the min of a list
+def Max(L):
+    n = len(L)
+    if n <= 1:
+        return 0
+    else:
+        flag = L[0]
+        for i in xrange(1, n):
+            flag = L[i] > flag and L[i] or flag
+
+    return flag
 
 # open a file
 # readline from an open file
@@ -356,6 +378,50 @@ def fq2c(qry):
 
     return buck
 
+# the codon usage bias
+codons = ['AAA', 'AAC', 'AAG', 'AAT', 'ACA', 'ACC', 'ACG', 'ACT', 'AGA', 'AGC', 'AGG', 'AGT', 'ATA', 'ATC', 'ATG', 'ATT', 'CAA', 'CAC', 'CAG', 'CAT', 'CCA', 'CCC', 'CCG', 'CCT', 'CGA', 'CGC', 'CGG', 'CGT', 'CTA', 'CTC', 'CTG', 'CTT', 'GAA', 'GAC', 'GAG', 'GAT', 'GCA', 'GCC', 'GCG', 'GCT', 'GGA', 'GGC', 'GGG', 'GGT', 'GTA', 'GTC', 'GTG', 'GTT', 'TAA', 'TAC', 'TAG', 'TAT', 'TCA', 'TCC', 'TCG', 'TCT', 'TGA', 'TGC', 'TGG', 'TGT', 'TTA', 'TTC', 'TTG', 'TTT']
+codons_idx ={'ACC': 5, 'ATG': 14, 'AAG': 2, 'AAA': 0, 'ATC': 13, 'AAC': 1, 'ATA': 12, 'AGG': 10, 'CCT': 23, 'CTC': 29, 'AGC': 9, 'ACA': 4, 'AGA': 8, 'CAT': 19, 'AAT': 3, 'ATT': 15, 'CTG': 30, 'CTA': 28, 'ACT': 7, 'CAC': 17, 'ACG': 6, 'CAA': 16, 'AGT': 11, 'CCA': 20, 'CCG': 22, 'CCC': 21, 'TAT': 51, 'GGT': 43, 'TGT': 59, 'CGA': 24, 'CAG': 18, 'CGC': 25, 'GAT': 35, 'CGG': 26, 'CTT': 31, 'TGC': 57, 'GGG': 42, 'TAG': 50, 'GGA': 40, 'TAA': 48, 'GGC': 41, 'TAC': 49, 'GAG': 34, 'TCG': 54, 'TTA': 60, 'TTT': 63, 'GAC': 33, 'CGT': 27, 'GAA': 32, 'TCA': 52, 'GCA': 36, 'GTA': 44, 'GCC': 37, 'GTC': 45, 'GCG': 38, 'GTG': 46, 'TTC': 61, 'GTT': 47, 'GCT': 39, 'TGA': 56, 'TTG': 62, 'TCC': 53, 'TGG': 58, 'TCT': 55}
+syms_idx = {'ACC': 8, 'ATG': 12, 'AAG': 4, 'AAA': 4, 'ATC': 13, 'AAC': 19, 'ATA': 13, 'AGG': 16, 'CCT': 6, 'CTC': 15, 'AGC': 2, 'ACA': 8, 'CTT': 15, 'CAT': 11, 'AAT': 19, 'ATT': 13, 'CTG': 15, 'CTA': 15, 'ACT': 8, 'CAC': 11, 'ACG': 8, 'CCG': 6, 'AGT': 2, 'CAG': 3, 'CAA': 3, 'CCC': 6, 'TAT': 20, 'GGT': 5, 'TGT': 0, 'CGA': 16, 'CCA': 6, 'TCT': 2, 'GAT': 1, 'CGG': 16, 'TTT': 9, 'TGC': 0, 'GGG': 5, 'TAG': 7, 'GGA': 5, 'TAA': 7, 'GGC': 5, 'TAC': 20, 'TTC': 9, 'TCG': 2, 'TTA': 15, 'AGA': 16, 'GAC': 1, 'TCC': 2, 'GAA': 14, 'TCA': 2, 'GCA': 10, 'GTA': 18, 'GCC': 10, 'GTC': 18, 'GCG': 10, 'GTG': 18, 'GAG': 14, 'GTT': 18, 'GCT': 10, 'TGA': 7, 'TTG': 15, 'CGT': 16, 'TGG': 17, 'CGC': 16}
+
+def codon_bias(s):
+    n = len(s)
+    nt = [0.] * 64
+    aa = [0.] * 21
+    for i in xrange(0, n, 3):
+        k = s[i: i + 3]
+        if k in codons_idx:
+            nt[codons_idx[k]] += 1
+            aa[syms_idx[k]] += 1
+    for k in codons:
+        if aa[syms_idx[k]] > 0:
+            nt[codons_idx[k]] /= aa[syms_idx[k]]
+
+    return nt
+
+# find the longest orf
+stop_codon = ['uaa', 'uag', 'uga', 'taa', 'tag', 'tga']
+def longest_orf(s):
+    n = len(s)
+    start = end = flag = 0
+    locus = [[0, 0], [1, 1], [2, 2]]
+    for i in xrange(n - 2):
+        idx = i % 3
+        st, ed = locus[idx][0], i + 3
+        if ed - st > flag:
+            start, end = st, ed
+            flag = ed - st
+
+        if s[i: ed] in stop_codon:
+            locus[idx][0] = locus[idx][1] = ed
+
+    return start, end
+
+# reverse complementary of sequence
+# waston crick pair
+wcp = {'a': 'T', 'A': 'T', 'g': 'C', 'G': 'C',  't': 'A', 'T': 'A', 'c': 'G', 'C': 'G'}
+def rc(s):
+    n = len(s)
+    return ''.join([wcp.get(s[elem], 'N') for elem in xrange(n - 1, -1, -1)])
 
 
 # cdf of normal distribution
@@ -370,13 +436,6 @@ def sum(x):
         flag += i
         #a.append(i)
     return flag
-# max or min
-def Max(x):
-    flag = float('-inf')
-    for i in x:
-        flag = flag < i and i or flag
-    return flag
-
 
 mean = lambda x: 1. * sum(x) / len(x)
 
@@ -387,6 +446,17 @@ def std(x):
         m = mean(x)
         var = sum([(elem - m) * (elem - m) for elem in x]) / (len(x) - 1.)
         return sqrt(var)
+
+
+# the bfprt
+def bfprt(x, k, key = lambda x: x):
+    n = len(x)
+    for i in xrange(0, n, n // 5):
+        insort(x, i, i + n // 5, key)
+    y = [x[i] for i in xrange(2, n, n // 5)]
+    m = len(y)
+    insort(y, 0, m)
+    p = y[m // 2]
 
 
 # rank the sorted data
@@ -675,45 +745,49 @@ def regionQuery(p, D, eps):
     neighbor = []
     for i in xrange(n):
         u, p = mannwhitneyu(P, D[i])
-        if p >= eps:
+        if p <= eps:
             neighbor.append(i)
 
     return neighbor
 
 #regionQuery = lambda p, D, Dtree, eps: Dtree.query(D[p], eps)
 
-
 def expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
     P = D[i]
     L[i] = C
-    visit = {}
-    for j in NeighborPts:
-        visit[j] = 'y'
-    for j in NeighborPts:
+    visit = {i: 'y'}
+    #for j in NeighborPts:
+    #    visit[j] = 'y'
+    #for j in NeighborPts:
+    while NeighborPts:
+        j = NeighborPts.pop()
         if j in visit:
             continue
         else:
             visit[j] = 'y'
         if L[j] == 0:
             #jNeighborPts = regionQuery(j, D, eps)
-            jNeighborPts = Dtree.query(D[j], eps)
-
-            #print 'inner Neighbor Pts size is', len(NeighborPtsi)
+            jNeighborPts = Dtree.query_radius(D[j], eps)
+            #print 'sub neighbor length', len(jNeighborPts)
             if len(jNeighborPts) >= MinPts:
                 #NeighborPts.extend(NeighborPtsi)
-                for k in jNeighborPts:
-                    if k not in visit:
-                        NeighborPts.append(k)
-                        visit[k] = 'y'
+                NeighborPts.extend([elem for elem in jNeighborPts if elem in visit])
+                #for k in jNeighborPts:
+                #    if k not in visit:
+                #        NeighborPts.append(k)
+                #        visit[k] = 'y'
+
         if L[j] <= 0:
+            #print 'find cluster C', C
             L[j] = C
-    print 'visit label', len(visit)
+    #print 'visit label', len(visit)
 
 # < 0: noise
 # = 0: unclassified, unvisitied
 # > 0: classified
-def dbscan(D, eps = .1, MinPts = 3, dist = mannwhitneyu_c):
+def dbscan(D, eps = 5e-4, MinPts = 5, dist = mannwhitneyu_c):
     Dtree = Cvt(D)
+    Dtree.fit()
     n = len(D)
     C = 0
     # label to record the type of point
@@ -721,20 +795,20 @@ def dbscan(D, eps = .1, MinPts = 3, dist = mannwhitneyu_c):
     for i in xrange(n):
         # if point i is visited, then pass
         if L[i] != 0:
+            #print 'skipping'
             continue
         #NeighborPts = regionQuery(i, D, Dtree, eps)
-        NeighborPts = Dtree.query(D[i], eps)
-        print 'Neighbor Pts size is', len(NeighborPts), i, eps
-        if len(NeighborPts) == 100000:
-            #print 'cover all point', [mannwhitneyu_c(D[i], D[elem]) for elem in xrange(n)]
-            print 'cover all point', Dtree.query(D[i], eps)
-
+        NeighborPts = Dtree.query_radius(D[i], eps)
+        #print 'Neighbor Pts size is', len(NeighborPts), i, eps
         if len(NeighborPts) < MinPts:
+            #print 'add noise'
             L[i] = -1
         else:
             C += 1
+            #print 'extension cluster', C
             expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts)
 
+    print 'end L', Max(L)
     return L
 
 
@@ -853,7 +927,7 @@ class Node:
 
 # cover tree
 class Cvt:
-    def __init__(self, data, eps = 5e-5, dist = mannwhitneyu_c):
+    def __init__(self, data, eps = 1e-6, dist = mannwhitneyu_c):
 
         self.data = data
         #self.eps = eps / 2.
@@ -885,7 +959,11 @@ class Cvt:
             level = n0.level + 1
             radius = self.radius * pow(scale, level)
 
-            if radius > self.eps and len(n0.rank) > 0:
+            if radius > self.eps and len(n0.rank) > 1:
+
+                #if n0.key == 0:
+                #    print 'first node', radius, len(n0.rank)
+
                 flag = 0
                 #print 'first x data', n0.key
                 for rank in self.split(n0.rank, radius):
@@ -946,6 +1024,21 @@ class Cvt:
                 flag += 1
         return flag, self.radius * pow(self.scale, p.level)
 
+    # print all node
+    def printbfs(self):
+        nodes = [self.root]
+        ct = {}
+        for node in nodes:
+            try:
+                ct[node.level] += 1
+            except:
+                ct[node.level] = 1
+            nodes.extend(node.child)
+
+        keys = ct.keys()
+        qsort(keys)
+        for i in keys:
+            print 'depth', i, ct[i]
 
     # query nearest point
     def query(self, x):
@@ -956,23 +1049,25 @@ class Cvt:
         #res = []
         rank = -1
         D = 1000000000
+        visit = {}
         # find all the node, which overlap with x
         while stack:
             node = stack.pop()
             level = node.level
             y = data[node.key]
-            d = self.dist(x, y)
+            if node.key not in visit:
+                d = self.dist(x, y)
+                visit[node.key] = d
+            else:
+                d = visit[node.key]
             if D > d:
                 #print 'reduce D'
                 rank, D = node.key, d
-
             r = self.radius * pow(scale, level)
             if d <= 0:
                 return [node.key]
-
-            elif 0 < d <= r:
+            elif 0 < d <= r and len(node.child) > 1:
                 stack.extend(node.child)
-
             else:
                 continue
 
@@ -980,9 +1075,6 @@ class Cvt:
         #print 'all leaves', len(self.leaf(self.root))
         #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
         return [rank]
-
-
-
 
     # query nearest point
     def query_radius(self, x, err = 1e-2):
@@ -998,26 +1090,42 @@ class Cvt:
         ranks = []
         # find all the node, which overlap with x
         flag = 0
+        visit = {}
         while stack:
             flag += 1
             node = stack.pop()
             #key = node.key
             level = node.level
             y = data[node.key]
-            d = self.dist(x, y)
+
+            if node.key not in visit:
+                d = self.dist(x, y)
+                visit[node.key] = d
+            else:
+                d = visit[node.key]
+
             r = self.radius * pow(scale, level)
             #print 'stack length', len(stack)
             #print 'stack visit'
-            if d + r <= err:
+            #print 'current find d', d, 'r', r, 'err', err, 'key', node.key, 'child', len(node.child), d <= err + r, len(node.child) > 1, d <= err +self.eps, node.rank, len(self.leaf(node))
+
+            #if d + r <= err + self.eps:
+            if d + r <= err + self.eps:
                 ranks.extend(self.leaf(node))
 
+            #elif d <= err + r and len(node.child) > 1:
             elif d <= err + r:
-                #print 'yes, overlap', 'key', key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child]
-                stack.extend(node.child)
+                #print 'yes, overlap', 'key', node.key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child], len(self.leaf(node))
+                if len(node.child) >= 1:
+                    stack.extend(node.child)
                 # if node is leaf, then add to ranks list
-                if len(node.child) == 0:
-                    if d <= err:
-                        ranks.extend(node.rank)
+                #else:
+                #    #if d <= err + self.eps:
+                #    if d <= err:
+                #        if node.rank:
+                #            ranks.extend(node.rank)
+                #        else:
+                #            ranks.append(node.key)
 
             else:
                 continue
@@ -1026,6 +1134,8 @@ class Cvt:
         #print 'all leaves', len(self.leaf(self.root))
         #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
         return ranks
+
+
 
 #def run(x, y, n):
 def run(n, qry):
@@ -1112,6 +1222,19 @@ def entry_point(argv):
 
     qry = float(argv[2])
 
+    dna = 'agatgctagtcgtagctagctagcatcgatcgatcgatcgatcgatgcacga'
+    dna = dna.upper()
+    print rc(dna)
+    print longest_orf(dna)
+    print codon_bias(dna)
+    t0 = time()
+    for i in xrange(int(qry)):
+        rc(dna)
+        longest_orf(dna)
+        codon_bias(dna)
+
+    print 'qry', qry, 'time is', time() - t0
+
     #fac = lambda x: sum(range(x))
     #print fac(K)
 
@@ -1151,18 +1274,13 @@ def entry_point(argv):
     print 'naive pass test', len([elem for elem in test if elem == 0]), len(test), flag
 
 
-    tmp = [1]
-    print 'tmp index', tmp[1: ]
-
-    alist = range(10 - 1, -1, -1)
-    print 'before sort', alist
-    qsort(alist, key = lambda x: x)
-    print ' after sort', alist
-
     Tree = Cvt(d1)
     t0 = time()
     Tree.fit()
+    Tree.printbfs()
     print 'construct time', time() - t0
+
+
     #test = Tree.query(d1[0])
     test = [mannwhitneyu_c(d1[idx], d1[elem]) for elem in Tree.query(d1[idx])]
     flag = -1
@@ -1180,11 +1298,11 @@ def entry_point(argv):
     flag = 1
     #for y in d1[: qry]:
     for i in xrange(qry):
+        break
         y = d1[i]
         #Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
         out = Tree.query_radius(y, 1e-2)
 
-        #for x in d1:
         if flag % 10000 == 0:
             error = 1000000000
             idx = -1
@@ -1195,24 +1313,36 @@ def entry_point(argv):
                 print 'error and err', error, err, err < error and err or error
 
                 idx = j
-
-            print 'query time', time() - t0, 'error', error, idx, out[:10], len(out)
+            #print 'query time', time() - t0, 'error', error, idx, out[:10], len(out)
+            print '10000 query time', time() - t0
 
             t0 = time()
         flag += 1
 
-#    mannwhitneyu_c(x, y)
+
+    #mannwhitneyu_c(x, y)
 
     #test = [mannwhitneyu_c(d1[0], y) for y in d1]
     #print 'real', [elem for elem in test if elem <= 1e-2]
     #print 'real', [[elem, mannwhitneyu_c(d1[0], d1[elem])] for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= 1e-2]
 
-
+    print 'debugging'
+    error = 10. / len(d1)
+    tmp0 = [int(elem) for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= error]
+    tmp1 = [int(elem) for elem in Tree.query_radius(d1[0], error)]
+    qsort(tmp0)
+    qsort(tmp1)
+    print 'linear search pts', len([mannwhitneyu_c(d1[0], d1[int(etmp)]) for etmp in tmp0])
+    print 'cover tree search', len(tmp1)
     #canopy(d1)
+
+
 
     #print centroid(d1)
     #d1 = [[intmask(1)] * 64 for elem in xrange(K)]
-    #cluster, noise = dbscan(d1)
+    t0 = time()
+    cluster = dbscan(d1)
+    print 'cluster type is', time() - t0
     #print 'cluster size', len(cluster), len(cluster[0]), len(noise)
     #label = dbscan(d1)
     #flag = 0
@@ -1240,20 +1370,8 @@ def entry_point(argv):
     #heappop(a)
     gc.collect()
     #buck = fq2c(argv[1:])
-    '''
-    root = Node([1, 2, 3], 0)
-    point = root
-    for i in xrange(1, K):
-        child = node([1], point.level + 1)
-        point.child.append(child)
-        point = child
 
-    point = root
-    while point.child:
-        point = point.child[0]
 
-    print point.level
-    '''
     return 0
 
 def target(*args):
