@@ -13,7 +13,7 @@ from random import random
 from rpython.rlib import rrandom
 from rpython.rlib.rfloat import erfc
 from rpython.rtyper.lltypesystem.rffi import r_ushort, r_int
-from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint
+from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint, string_to_int
 from rpython.rlib import rfile
 from rpython.rlib import rmmap
 from rpython.rlib.listsort import TimSort
@@ -674,69 +674,6 @@ def kmean(X, eps = .8, itr = 25):
     return Cs
     #return flag
 
-# the dbscan algorithm
-def neighbor0(pt, uncluster, noise, x, eps = .8, minpts = 5, dist = mannwhitneyu):
-    seed, new_uncluster, new_noise = [], [], []
-    while uncluster:
-        i = uncluster.pop()
-        ptu = x[i]
-        PT = map(intmask, pt)
-        u, p = mannwhitneyu(PT, map(intmask, ptu))
-        #print 'p is', p
-        if p >= eps:
-            seed.append(i)
-        else:
-            #print 'cluster add', p
-            new_uncluster.append(i)
-
-    while noise:
-        i = noise.pop()
-        ptn = x[i]
-        PT = map(intmask, pt)
-        u, p = mannwhitneyu(PT, map(intmask, ptn))
-        #print 'p is', p
-        #if mannwhitneyu(pt, ptn) >= eps:
-        if p >= eps:
-            seed.append(i)
-        else:
-            #print 'noise add', p
-            new_noise.append(i)
-
-    #print 'find neighbor', len(seed), len(new_uncluster), len(new_noise)
-    return seed, new_uncluster, new_noise
-
-
-def dbscan0(x, eps = .9, minpts = 3, dist = mannwhitneyu):
-    n = len(x)
-    uncluster, noise, cluster = [r_int(elem) for elem in xrange(n)], [], []
-    flag = 0
-    while uncluster:
-        i = uncluster.pop()
-        ptl = x[i]
-        seed, uncluster, noise = neighbor(ptl, uncluster, noise, x, eps, minpts, dist)
-
-        #print 'call nn', flag
-        flag += 1
-
-        if len(seed) >= minpts:
-            current = [i]
-            while seed:
-                last = seed.pop()
-                current.append(last)
-                ptl = x[last]
-                sub_seed, uncluster, noise = neighbor(ptl, uncluster, noise, x, eps, minpts - 1, dist)
-
-                #print 'call nn', flag
-                flag += 1
-
-                seed.extend(sub_seed)
-
-            cluster.append(current)
-
-        else:
-            noise.append(i)
-
-    return cluster, noise
 
 # dbscan algorithm
 def regionQuery(p, D, eps):
@@ -750,52 +687,41 @@ def regionQuery(p, D, eps):
 
     return neighbor
 
-#regionQuery = lambda p, D, Dtree, eps: Dtree.query(D[p], eps)
-
 def expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
-    P = D[i]
     L[i] = C
-    visit = {i: 'y'}
-    #for j in NeighborPts:
-    #    visit[j] = 'y'
-    #for j in NeighborPts:
-    while NeighborPts:
-        j = NeighborPts.pop()
-        if j in visit:
-            continue
-        else:
-            visit[j] = 'y'
-        if L[j] == 0:
-            #jNeighborPts = regionQuery(j, D, eps)
-            jNeighborPts = Dtree.query_radius(D[j], eps)
-            #print 'sub neighbor length', len(jNeighborPts)
-            if len(jNeighborPts) >= MinPts:
-                #NeighborPts.extend(NeighborPtsi)
-                NeighborPts.extend([elem for elem in jNeighborPts if elem in visit])
-                #for k in jNeighborPts:
-                #    if k not in visit:
-                #        NeighborPts.append(k)
-                #        visit[k] = 'y'
+    unvisit = [elem for elem in NeighborPts if L[elem] == 0]
+    for j in NeighborPts:
+        L[j] = C
 
-        if L[j] <= 0:
-            #print 'find cluster C', C
-            L[j] = C
-    #print 'visit label', len(visit)
+    #print 'set all C'
+    while unvisit:
+        j = unvisit.pop()
+        jNeighborPts = Dtree.query_radius(D[j], eps)
+        if len(jNeighborPts) > MinPts:
+            new = [elem for elem in jNeighborPts if L[elem] == 0]
+            if new:
+                unvisit.extend(new)
+                for k in new:
+                    L[k] = C
 
 # < 0: noise
 # = 0: unclassified, unvisitied
 # > 0: classified
-def dbscan(D, eps = 5e-4, MinPts = 5, dist = mannwhitneyu_c):
+def dbscan(D, eps = 1e-3, MinPts = 10, dist = mannwhitneyu_c):
     Dtree = Cvt(D)
     Dtree.fit()
     n = len(D)
     C = 0
     # label to record the type of point
     L = [0] * n
+    t0 = time()
     for i in xrange(n):
+        if i % 100000 == 0:
+            print 'iteration', i, time() - t0
+            t0 = time()
+
         # if point i is visited, then pass
         if L[i] != 0:
-            #print 'skipping'
             continue
         #NeighborPts = regionQuery(i, D, Dtree, eps)
         NeighborPts = Dtree.query_radius(D[i], eps)
@@ -808,7 +734,19 @@ def dbscan(D, eps = 5e-4, MinPts = 5, dist = mannwhitneyu_c):
             #print 'extension cluster', C
             expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts)
 
+    fq = {}
+    for i in L:
+        try:
+            fq[i] += 1
+        except:
+            fq[i] = 1
+
+    for i in fq:
+        print 'cluster', i, fq[i]
+
     print 'end L', Max(L)
+
+
     return L
 
 
@@ -916,17 +854,18 @@ def canopy(data, t1 = .4, t2 = .2, dist = mannwhitneyu_c):
     #canopies.close()
     return canopies
 
-
 # multiple child node
-class Node:
-    def __init__(self, key, rank, level = 0):
-        self.level = level
+class Node0:
+    def __init__(self, key, rank, level = 0, radius = 0):
         self.key = key
         self.rank = rank
+        self.level = level
+        self.radius = radius
+
         self.child = []
 
 # cover tree
-class Cvt:
+class Cvt0:
     def __init__(self, data, eps = 1e-6, dist = mannwhitneyu_c):
 
         self.data = data
@@ -974,7 +913,6 @@ class Cvt:
                     flag += 1
 
                 #print 'split', flag, 'child length', len(n0.child)
-
             else:
                 #print 'not split'
                 continue
@@ -989,7 +927,6 @@ class Cvt:
             while rank:
                 y = rank.pop()
                 if self.dist(data[x], data[y]) <= radius:
-                #if 1:
                     inner.append(y)
                 else:
                     outer.append(y)
@@ -1135,6 +1072,257 @@ class Cvt:
         #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
         return ranks
 
+# multiple child node
+class Node:
+    #def __init__(self, key, rank, level = 0, radius = 1):
+    def __init__(self, key, rank, radius = 1):
+        self.key = key
+        self.rank = rank
+        #self.level = level
+        self.radius = radius
+        self.child = []
+
+# cover tree
+class Cvt:
+    def __init__(self, data, eps = 1e-8, dist = mannwhitneyu_c):
+
+        self.data = data
+        self.eps = eps
+        self.scale = .2
+        self.dist = dist
+        radius = -1
+        n = len(data)
+        #flag = 0
+        x = 0
+        for y in xrange(1, n):
+            current = self.dist(data[x], data[y])
+            #radius = radius < current and current or radius
+            radius = current if radius < current else radius
+            #flag += current < self.scale and 1 or 0
+
+        print 'current radius is', radius
+        self.root = Node(0, range(n), radius)
+
+        #print 'at least half', flag, self.scale
+        #self.radius = radius
+        #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
+        #self.maxlevel = log(12, 2)
+
+    def fit(self):
+
+        nodes = [self.root]
+        #scale = self.scale
+        while nodes:
+            n0 = nodes.pop()
+            #level = n0.level + 1
+            #radius = self.radius * pow(scale, level)
+            #cutoff = n0.radius * pow(scale, level)
+
+            #if cutoff > self.eps and len(n0.rank) > 1:
+            if n0.radius > self.eps and len(n0.rank) > 1:
+                cutoff = n0.radius * self.scale
+                #if n0.key == 0:
+                #    print 'first node', radius, len(n0.rank)
+
+                #flag = 0
+                #print 'first x data', n0.key
+                for (radius, rank) in self.split(n0.rank, cutoff):
+                    #print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
+                    #n1 = Node(rank[0], rank, level, radius)
+                    #if radius < 0:
+                    #    continue
+                    n1 = Node(rank[0], rank, radius)
+                    n0.child.append(n1)
+                    nodes.append(n1)
+                    #flag += 1
+            elif n0.radius > self.eps and len(n0.rank) <= 1:
+                print 'debug test'
+                n0.radius = 0
+                #print 'split', flag, 'child length', len(n0.child)
+
+            #elif n0.radius <= self.eps:
+            #    data = self.data
+            #    if n0.key == len(data) // 2:
+            #        print 'very small point', len(n0.rank), Max([mannwhitneyu_c(data[n0.rank[0]], data[elem]) for elem in n0.rank]), len(n0.child)
+            else:
+                #if len(n0.child) == 1:
+                #    print 'not split', n0.key, n0.child[0].key
+                #elif len(n0.child) == 0:
+                #    print 'not split 2', n0.key, n0.radius
+                continue
+
+    # setup root
+    def split(self, rank, cutoff):
+        rank[0], rank[-1] = rank[-1], rank[0]
+        data = self.data
+        while rank:
+            #radius = -1
+            radius = 0
+            x = rank.pop()
+            inner, outer = [x], []
+            while rank:
+                y = rank.pop()
+                current = self.dist(data[x], data[y])
+                if current <= cutoff:
+                    #radius = radius < current and current or radius
+                    radius = current if radius < current else radius
+                    #if radius == -1:
+                    #    print 'radius', radius, 'current longest', current, 'change', radius < current
+
+                    inner.append(y)
+                else:
+                    outer.append(y)
+
+                #print 'current radius is', radius, current
+
+            #print 'inner set size', len(inner)
+            #if radius == -1:
+            #    print 'error radius', cutoff, [mannwhitneyu_c(data[inner[0]], data[elem]) for elem in inner]
+            yield radius, inner
+            rank = outer
+
+    # dfs get all leaves's data by give an inner node
+    def leaf(self, n):
+        nodes = [n]
+        ranks = []
+        while nodes:
+            node = nodes.pop()
+            if node.child:
+                nodes.extend(node.child)
+            else:
+                ranks.extend(node.rank)
+
+        return ranks
+
+    # for debug
+    def root_leaf(self):
+        p = self.root
+        while len(p.child) > 0:
+            p = [elem for elem in p.child if elem.key == 0][0]
+
+        #return p.rank, p.level, self.radius * pow(self.scale, p.level)
+        flag = 0
+        for i in p.rank:
+            #if mannwhitneyu_c(self.data[0], self.data[i]) > self.radius * pow(self.scale, p.level):
+            if mannwhitneyu_c(self.data[0], self.data[i]) > p.radius:
+                flag += 1
+        #return flag, self.radius * pow(self.scale, p.level)
+        return flag, p.radius
+
+
+    # print all node
+    def printbfs(self):
+        pass
+
+    # query nearest point
+    def query(self, x):
+        #scale = self.scale
+        data = self.data
+        stack = [self.root]
+        #print 'root scale and level', scale, self.root.level
+        #res = []
+        rank = -1
+        D = 1000000000
+        visit = {}
+        # find all the node, which overlap with x
+        while stack:
+            node = stack.pop()
+            #level = node.level
+            y = data[node.key]
+            if node.key not in visit:
+                d = self.dist(x, y)
+                visit[node.key] = d
+            else:
+                d = visit[node.key]
+            if D > d:
+                #print 'reduce D'
+                rank, D = node.key, d
+            #r = self.radius * pow(scale, level)
+            r = node.radius
+            if d <= 0:
+                return [node.key]
+            elif 0 < d <= r and len(node.child) > 1:
+                stack.extend(node.child)
+            else:
+                continue
+
+        #print 'search times', flag
+        #print 'all leaves', len(self.leaf(self.root))
+        #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
+        return [rank]
+
+    # query nearest point
+    def query_radius(self, x, err = 1e-2):
+        #print '0 leaf', self.root_leaf()
+        #err = max(self.dist(x, x), err)
+        #print 'bias', err
+        #err -= self.eps
+        scale = self.scale
+        data = self.data
+        stack = [self.root]
+        #print 'root scale and level', scale, self.root.level
+        #res = []
+        ranks = []
+        # find all the node, which overlap with x
+        flag = 0
+        visit = {}
+        while stack:
+            flag += 1
+            node = stack.pop()
+            #key = node.key
+            #level = node.level
+            y = data[node.key]
+
+            if node.key not in visit:
+                d = self.dist(x, y)
+                visit[node.key] = d
+            else:
+                d = visit[node.key]
+
+            #r = self.radius * pow(scale, level)
+            r = node.radius
+            #print 'stack length', len(stack)
+            #print 'stack visit'
+            #print 'current find d', d, 'r', r, 'err', err, 'key', node.key, 'child', len(node.child), d <= err + r, len(node.child) > 1, d <= err +self.eps, node.rank, len(self.leaf(node))
+
+            #if d + r <= err:
+            if d + r <= err + self.eps:
+
+                leaves = self.leaf(node)
+                ranks.extend(leaves)
+                #if x == self.data[len(self.data) // 2]:
+                #    print 'radius is', r, 'd is', d, 'err', err, leaves, len(leaves), 'max number', Max([mannwhitneyu_c(x, self.data[elem]) for elem in leaves])
+                #print 'radius is', r, 'd is', d, 'err', err, leaves, len(leaves), 'max_mann', Max([mannwhitneyu_c(x, self.data[elem]) for elem in leaves])
+
+
+            #elif d <= err + r and len(node.child) > 1:
+            #elif d <= err + r:
+            elif d <= err + r + self.eps:
+                #print 'yes, overlap', 'key', node.key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child], len(self.leaf(node))
+                #if len(node.child) >= 1:
+                #if len(node.child) > 0:
+                #    stack.extend(node.child)
+                stack.extend(node.child)
+                # if node is leaf, then add to ranks list
+                #else:
+                #    #if d <= err + self.eps:
+                #    if d <= err:
+                #        if node.rank:
+                #            ranks.extend(node.rank)
+                #        else:
+                #            ranks.append(node.key)
+
+            else:
+                continue
+
+        #print 'search times', flag
+        #print 'all leaves', len(self.leaf(self.root))
+        #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
+        #if x == self.data[len(self.data) // 3]:
+        #    print 'idx rank is', len(ranks), len(self.data) // 3
+
+        return ranks
+
 
 
 #def run(x, y, n):
@@ -1214,6 +1402,16 @@ def run(n, qry):
     '''
 
 
+# random sample from a list
+def sample(x, n):
+    N = len(x)
+    if N < n:
+        n = N
+    y = [x[int(random() * N)] for elem in xrange(n)]
+    qsort(y)
+    return y
+
+
 def entry_point(argv):
     try:
         K = int(argv[1])
@@ -1254,7 +1452,7 @@ def entry_point(argv):
     for i in xrange(K):
         #b = [int(random() * pow(2, 15) - 1) for elem0 in xrange(32)]
         #b = [int(((random() - .5) * 2 + i % 10) * 10) for elem0 in xrange(32)]
-        b = [random() for elem0 in xrange(32)]
+        b = [random() + i % 10 for elem0 in xrange(32)]
         #TimSort(b).sort()
         qsort(b)
         #d1.append([r_ushort(elem) for elem in b])
@@ -1264,7 +1462,7 @@ def entry_point(argv):
     d1[int(K) * 10]
     d1.extend(d1)
 
-    idx = 1000
+    idx = len(d1) // 2
     test = [mannwhitneyu_c(d1[idx], elem) for elem in d1]
     flag = -1
     for i in test:
@@ -1298,10 +1496,10 @@ def entry_point(argv):
     flag = 1
     #for y in d1[: qry]:
     for i in xrange(qry):
-        break
+        #break
         y = d1[i]
         #Tree.query(d1[0]), mannwhitneyu_c(d1[0], d1[0])
-        out = Tree.query_radius(y, 1e-2)
+        out = Tree.query_radius(y, 1e-3)
 
         if flag % 10000 == 0:
             error = 1000000000
@@ -1310,7 +1508,7 @@ def entry_point(argv):
                 err = mannwhitneyu_c(y, d1[j])
                 if err < error:
                     error = err
-                print 'error and err', error, err, err < error and err or error
+                #print 'error and err', error, err, err < error and err or error
 
                 idx = j
             #print 'query time', time() - t0, 'error', error, idx, out[:10], len(out)
@@ -1326,20 +1524,31 @@ def entry_point(argv):
     #print 'real', [elem for elem in test if elem <= 1e-2]
     #print 'real', [[elem, mannwhitneyu_c(d1[0], d1[elem])] for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= 1e-2]
 
-    print 'debugging'
-    error = 10. / len(d1)
-    tmp0 = [int(elem) for elem in xrange(len(d1)) if mannwhitneyu_c(d1[0], d1[elem]) <= error]
-    tmp1 = [int(elem) for elem in Tree.query_radius(d1[0], error)]
+    #print 'debugging'
+    error = 10. / len(d1) < 1e-6 and 10. / len(d1) or 1e-6
+    #error = 0
+    print 'debugging error', error
+    idx = len(d1) // 3
+
+
+    idx2 = Tree.query(d1[idx])[0]
+    print 'query function', mannwhitneyu_c(d1[idx2], d1[idx]), idx2, idx
+
+    tmp0 = [int(elem) for elem in xrange(len(d1)) if mannwhitneyu_c(d1[idx], d1[elem]) <= error]
+    tmp1 = [int(elem) for elem in Tree.query_radius(d1[idx], error)]
     qsort(tmp0)
     qsort(tmp1)
-    print 'linear search pts', len([mannwhitneyu_c(d1[0], d1[int(etmp)]) for etmp in tmp0])
-    print 'cover tree search', len(tmp1)
+    print 'linear search pts', len(tmp0), Max([mannwhitneyu_c(d1[idx], d1[int(etmp)]) for etmp in tmp0])
+    t0 = time()
+    print 'cover tree search', len(tmp1), sum([mannwhitneyu_c(d1[idx], d1[elem]) <= error for elem in Tree.query_radius(d1[idx], error)]), 'time', time() - t0
     #canopy(d1)
+    print 'cover search length', len(Tree.query_radius(d1[idx], error)), idx
 
 
 
     #print centroid(d1)
     #d1 = [[intmask(1)] * 64 for elem in xrange(K)]
+    print 'dbscan', len(d1)
     t0 = time()
     cluster = dbscan(d1)
     print 'cluster type is', time() - t0
