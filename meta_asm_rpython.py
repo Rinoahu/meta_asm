@@ -19,7 +19,7 @@ from rpython.rlib import rmmap
 from rpython.rlib.listsort import TimSort
 from rpython.rlib import listsort
 #from struct import pack
-from time import time
+from time import time, sleep
 import gc
 from heapq import heappush, heappop, heapreplace, heapify
 
@@ -93,6 +93,147 @@ def quicksort(x, l, r, key = lambda x: x):
 # the main function of qsort
 def qsort(x, key = lambda x: x):
     quicksort(x, 0, len(x) - 1, key)
+
+
+# the double linked-list for int
+class vertex:
+    def __init__(self, val):
+        self.val = val
+        self.prev = None
+        self.next = None
+
+class llist:
+    def __init__(self, iterable):
+        self.first = self.last = p = None
+        self.N = 0
+        for i in iterable:
+            node = vertex(i)
+            if self.N == 0:
+                self.first = self.last = node
+            else:
+                self.last.next = node
+                self.last = self.last.next
+
+            self.N += 1
+
+    def __len__(self):
+        return self.N
+
+    # pop last
+    def pop(self):
+        #assert self.last != None
+        if self.N > 0:
+            node = self.last
+            self.last = self.last.prev
+            self.N -= 1
+            return node
+
+    # append
+    def append(self, val):
+        node = vertex(val)
+        if self.N > 0:
+            self.last.next = node
+            self.last = node
+        else:
+            self.first = self.last = node
+
+        self.N += 1
+    # extend
+    def extend(self, iterable):
+        for i in iterable:
+            self.append(i)
+
+
+    # pop left
+    def popleft(self):
+        #assert self.first != None
+        if self.N > 0:
+            node = self.first
+            self.first = self.first.next
+            self.N -= 1
+            return node
+
+    # pop left
+    def appendleft(self, val):
+        node = vertex(val)
+        if self.N > 0:
+            node.next = self.first
+            self.first = node
+        else:
+            self.first = self.last = node
+        self.N += 1
+
+
+# the double linked-list for int
+class vtx_nd:
+    def __init__(self, val):
+        self.val = val
+        self.prev = None
+        self.next = None
+
+class llist_nd:
+    def __init__(self, iterable):
+        self.first = self.last = p = None
+        self.N = 0
+        for i in iterable:
+            node = vtx_nd(i)
+            if self.N == 0:
+                self.first = self.last = node
+            else:
+                self.last.next = node
+                self.last = self.last.next
+
+            self.N += 1
+
+    def __len__(self):
+        return self.N
+
+    # pop last
+    def pop(self):
+        #assert self.last != None
+        if self.N > 0:
+            node = self.last
+            self.last = self.last.prev
+            self.N -= 1
+            return node
+
+    # append
+    def append(self, val):
+        node = vtx_nd(val)
+        if self.N > 0:
+            self.last.next = node
+            self.last = node
+        else:
+            self.first = self.last = node
+
+        self.N += 1
+    # extend
+    def extend(self, iterable):
+        for i in iterable:
+            self.append(i)
+
+
+    # pop left
+    def popleft(self):
+        #assert self.first != None
+        if self.N > 0:
+            node = self.first
+            self.first = self.first.next
+            self.N -= 1
+            return node
+
+    # pop left
+    def appendleft(self, val):
+        node = vtx_nd(val)
+        if self.N > 0:
+            node.next = self.first
+            self.first = node
+        else:
+            self.first = self.last = node
+        self.N += 1
+
+
+
 
 
 # map function
@@ -675,7 +816,7 @@ def kmean(X, eps = .8, itr = 25):
     #return flag
 
 
-# dbscan algorithm
+# DBScan algorithm
 def regionQuery(p, D, eps):
     n = len(D)
     P = D[p]
@@ -687,44 +828,83 @@ def regionQuery(p, D, eps):
 
     return neighbor
 
-def expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
+def expendCluster0(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
     L[i] = C
     unvisit = [elem for elem in NeighborPts if L[elem] == 0]
+    #unvisit = llist([elem for elem in NeighborPts if L[elem] == 0])
     for j in NeighborPts:
         L[j] = C
 
     #print 'set all C'
-    while unvisit:
+    #while unvisit:
+    while len(unvisit) > 0:
         j = unvisit.pop()
-        jNeighborPts = Dtree.query_radius(D[j], eps)
+        #j = unvisit.popleft().val
+        if len(D) <= 50000:
+            jNeighborPts = regionQuery(j, D, eps)
+        else:
+            jNeighborPts = Dtree.query_radius(D[j], eps)
         if len(jNeighborPts) > MinPts:
             new = [elem for elem in jNeighborPts if L[elem] == 0]
-            if new:
-                unvisit.extend(new)
-                for k in new:
-                    L[k] = C
+            unvisit.extend(new)
+            for k in new:
+                L[k] = C
+
+            #if new:
+            #    unvisit.extend(new)
+            #    for k in new:
+            #        L[k] = C
+    #gc.collect()
+
+
+def expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
+    L[i] = C
+    unvisit = [elem for elem in NeighborPts if L[elem] == 0]
+
+    #print 'set all C'
+    #while unvisit:
+    while len(unvisit) > 0:
+        j = unvisit.pop()
+        if L[j] <= 0:
+            L[j] = C
+        else:
+            continue
+
+        if len(D) <= 50000:
+            jNeighborPts = regionQuery(j, D, eps)
+        else:
+            jNeighborPts = Dtree.query_radius(D[j], eps)
+        if len(jNeighborPts) > MinPts:
+            new = [elem for elem in jNeighborPts if L[elem] == 0]
+            unvisit.extend(new)
 
 # < 0: noise
 # = 0: unclassified, unvisitied
 # > 0: classified
 def dbscan(D, eps = 1e-3, MinPts = 10, dist = mannwhitneyu_c):
     Dtree = Cvt(D)
-    Dtree.fit()
+    if len(D) < 50000:
+        pass
+    else:
+        Dtree.fit()
     n = len(D)
     C = 0
     # label to record the type of point
     L = [0] * n
     t0 = time()
     for i in xrange(n):
-        if i % 100000 == 0:
-            print 'iteration', i, time() - t0
+        if i % 10000 == 0:
+            #print 'iteration', i, time() - t0
             t0 = time()
 
         # if point i is visited, then pass
         if L[i] != 0:
             continue
-        #NeighborPts = regionQuery(i, D, Dtree, eps)
-        NeighborPts = Dtree.query_radius(D[i], eps)
+
+        if len(D) < 50000:
+            NeighborPts = regionQuery(i, D, eps)
+        else:
+            NeighborPts = Dtree.query_radius(D[i], eps)
         #print 'Neighbor Pts size is', len(NeighborPts), i, eps
         if len(NeighborPts) < MinPts:
             #print 'add noise'
@@ -854,223 +1034,6 @@ def canopy(data, t1 = .4, t2 = .2, dist = mannwhitneyu_c):
     #canopies.close()
     return canopies
 
-# multiple child node
-class Node0:
-    def __init__(self, key, rank, level = 0, radius = 0):
-        self.key = key
-        self.rank = rank
-        self.level = level
-        self.radius = radius
-
-        self.child = []
-
-# cover tree
-class Cvt0:
-    def __init__(self, data, eps = 1e-6, dist = mannwhitneyu_c):
-
-        self.data = data
-        #self.eps = eps / 2.
-        self.eps = eps
-        self.scale = .2
-        self.dist = dist
-        n = len(data)
-        self.root = Node(0, range(n), 0)
-        radius = -1
-        flag = 0
-        x = 0
-        for y in xrange(1, n):
-            current = self.dist(data[x], data[y])
-            radius = current > radius and current or radius
-            flag += current < self.scale and 1 or 0
-
-        print 'at least half', flag, self.scale
-        self.radius = radius
-        #self.maxlevel = radius > 0 and int(log(radius, 2) + 1) or 1
-        #self.maxlevel = log(12, 2)
-
-
-    def fit(self):
-
-        nodes = [self.root]
-        scale = self.scale
-        while nodes:
-            n0 = nodes.pop()
-            level = n0.level + 1
-            radius = self.radius * pow(scale, level)
-
-            if radius > self.eps and len(n0.rank) > 1:
-
-                #if n0.key == 0:
-                #    print 'first node', radius, len(n0.rank)
-
-                flag = 0
-                #print 'first x data', n0.key
-                for rank in self.split(n0.rank, radius):
-                    #print 'split set size', len(rank), 'level', level, 'radius', radius, 'self radius', self.radius
-                    n1 = Node(rank[0], rank, level)
-                    n0.child.append(n1)
-                    nodes.append(n1)
-                    flag += 1
-
-                #print 'split', flag, 'child length', len(n0.child)
-            else:
-                #print 'not split'
-                continue
-
-    # setup root
-    def split(self, rank, radius):
-        rank[0], rank[-1] = rank[-1], rank[0]
-        data = self.data
-        while rank:
-            x = rank.pop()
-            inner, outer = [x], []
-            while rank:
-                y = rank.pop()
-                if self.dist(data[x], data[y]) <= radius:
-                    inner.append(y)
-                else:
-                    outer.append(y)
-
-            #print 'inner set size', len(inner)
-            yield inner
-            rank = outer
-
-    # dfs get all leaves's data by give an inner node
-    def leaf(self, n):
-        nodes = [n]
-        ranks = []
-        while nodes:
-            node = nodes.pop()
-            if node.child:
-                nodes.extend(node.child)
-            else:
-                ranks.extend(node.rank)
-
-        return ranks
-
-    # for debug
-    def root_leaf(self):
-        p = self.root
-        while len(p.child) > 0:
-            p = [elem for elem in p.child if elem.key == 0][0]
-
-        #return p.rank, p.level, self.radius * pow(self.scale, p.level)
-        flag = 0
-        for i in p.rank:
-            if mannwhitneyu_c(self.data[0], self.data[i]) > self.radius * pow(self.scale, p.level):
-                flag += 1
-        return flag, self.radius * pow(self.scale, p.level)
-
-    # print all node
-    def printbfs(self):
-        nodes = [self.root]
-        ct = {}
-        for node in nodes:
-            try:
-                ct[node.level] += 1
-            except:
-                ct[node.level] = 1
-            nodes.extend(node.child)
-
-        keys = ct.keys()
-        qsort(keys)
-        for i in keys:
-            print 'depth', i, ct[i]
-
-    # query nearest point
-    def query(self, x):
-        scale = self.scale
-        data = self.data
-        stack = [self.root]
-        #print 'root scale and level', scale, self.root.level
-        #res = []
-        rank = -1
-        D = 1000000000
-        visit = {}
-        # find all the node, which overlap with x
-        while stack:
-            node = stack.pop()
-            level = node.level
-            y = data[node.key]
-            if node.key not in visit:
-                d = self.dist(x, y)
-                visit[node.key] = d
-            else:
-                d = visit[node.key]
-            if D > d:
-                #print 'reduce D'
-                rank, D = node.key, d
-            r = self.radius * pow(scale, level)
-            if d <= 0:
-                return [node.key]
-            elif 0 < d <= r and len(node.child) > 1:
-                stack.extend(node.child)
-            else:
-                continue
-
-        #print 'search times', flag
-        #print 'all leaves', len(self.leaf(self.root))
-        #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
-        return [rank]
-
-    # query nearest point
-    def query_radius(self, x, err = 1e-2):
-        #print '0 leaf', self.root_leaf()
-        #err = max(self.dist(x, x), err)
-        #print 'bias', err
-        #err -= self.eps
-        scale = self.scale
-        data = self.data
-        stack = [self.root]
-        #print 'root scale and level', scale, self.root.level
-        #res = []
-        ranks = []
-        # find all the node, which overlap with x
-        flag = 0
-        visit = {}
-        while stack:
-            flag += 1
-            node = stack.pop()
-            #key = node.key
-            level = node.level
-            y = data[node.key]
-
-            if node.key not in visit:
-                d = self.dist(x, y)
-                visit[node.key] = d
-            else:
-                d = visit[node.key]
-
-            r = self.radius * pow(scale, level)
-            #print 'stack length', len(stack)
-            #print 'stack visit'
-            #print 'current find d', d, 'r', r, 'err', err, 'key', node.key, 'child', len(node.child), d <= err + r, len(node.child) > 1, d <= err +self.eps, node.rank, len(self.leaf(node))
-
-            #if d + r <= err + self.eps:
-            if d + r <= err + self.eps:
-                ranks.extend(self.leaf(node))
-
-            #elif d <= err + r and len(node.child) > 1:
-            elif d <= err + r:
-                #print 'yes, overlap', 'key', node.key, 'err', err, 'd', d, 'r', r, [elem.key for elem in node.child], len(self.leaf(node))
-                if len(node.child) >= 1:
-                    stack.extend(node.child)
-                # if node is leaf, then add to ranks list
-                #else:
-                #    #if d <= err + self.eps:
-                #    if d <= err:
-                #        if node.rank:
-                #            ranks.extend(node.rank)
-                #        else:
-                #            ranks.append(node.key)
-
-            else:
-                continue
-
-        #print 'search times', flag
-        #print 'all leaves', len(self.leaf(self.root))
-        #return [elem for elem in ranks if self.dist(x, data[elem]) <= err]
-        return ranks
 
 # multiple child node
 class Node:
@@ -1260,15 +1223,19 @@ class Cvt:
         scale = self.scale
         data = self.data
         stack = [self.root]
+        #stack = llist_nd([self.root])
         #print 'root scale and level', scale, self.root.level
         #res = []
         ranks = []
         # find all the node, which overlap with x
         flag = 0
         visit = {}
-        while stack:
+        #while stack:
+        while len(stack) > 0:
+
             flag += 1
             node = stack.pop()
+            #node = stack.popleft().val
             #key = node.key
             #level = node.level
             y = data[node.key]
