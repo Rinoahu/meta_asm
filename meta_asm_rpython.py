@@ -828,17 +828,42 @@ def regionQuery(p, D, eps):
 
     return neighbor
 
-def expendCluster0(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
+def expandCluster0(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
+
+    L[i] = C
+    unvisit = [elem for elem in NeighborPts]
+    visit = {}
+    while len(unvisit) > 0:
+        j = unvisit.pop()
+        if j not in visit:
+            visit[j] = 0
+        else:
+            continue
+       #j = unvisit.popleft().val
+        if len(D) <= 50000:
+            jNeighborPts = regionQuery(j, D, eps)
+        else:
+            jNeighborPts = Dtree.query_radius(D[j], eps)
+        if len(jNeighborPts) > MinPts:
+            new = [elem for elem in jNeighborPts]
+            unvisit.extend(new)
+        if L[j] < 1:
+            L[j] = C
+
+
+def expandCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
+
     L[i] = C
     unvisit = [elem for elem in NeighborPts if L[elem] == 0]
     #unvisit = llist([elem for elem in NeighborPts if L[elem] == 0])
     for j in NeighborPts:
         L[j] = C
 
-    #print 'set all C'
     #while unvisit:
     while len(unvisit) > 0:
         j = unvisit.pop()
+        if L[j] < 1:
+            L[j] = C
         #j = unvisit.popleft().val
         if len(D) <= 50000:
             jNeighborPts = regionQuery(j, D, eps)
@@ -850,33 +875,9 @@ def expendCluster0(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
             for k in new:
                 L[k] = C
 
-            #if new:
-            #    unvisit.extend(new)
-            #    for k in new:
-            #        L[k] = C
+    #print 'set all C', C, i, flag, len(f_dict)
     #gc.collect()
 
-
-def expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts):
-    L[i] = C
-    unvisit = [elem for elem in NeighborPts if L[elem] == 0]
-
-    #print 'set all C'
-    #while unvisit:
-    while len(unvisit) > 0:
-        j = unvisit.pop()
-        if L[j] <= 0:
-            L[j] = C
-        else:
-            continue
-
-        if len(D) <= 50000:
-            jNeighborPts = regionQuery(j, D, eps)
-        else:
-            jNeighborPts = Dtree.query_radius(D[j], eps)
-        if len(jNeighborPts) > MinPts:
-            new = [elem for elem in jNeighborPts if L[elem] == 0]
-            unvisit.extend(new)
 
 # < 0: noise
 # = 0: unclassified, unvisitied
@@ -910,9 +911,11 @@ def dbscan(D, eps = 1e-3, MinPts = 10, dist = mannwhitneyu_c):
             #print 'add noise'
             L[i] = -1
         else:
+            #print 'before C', C, i
             C += 1
+            #print 'after C', C, i
             #print 'extension cluster', C
-            expendCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts)
+            expandCluster(i, NeighborPts, D, Dtree, L, C, eps, MinPts)
 
     fq = {}
     for i in L:
