@@ -18,19 +18,23 @@ from functools import partial
 
 # the sequence class
 class Seq:
-    def __init__(self, id = None, seq = None, description = None, qual = None ):
+
+    def __init__(self, id=None, seq=None, description=None, qual=None):
         self.id = id
         self.seq = seq
         self.description = description
         self.qual = qual
-    def update(self, id = None, seq = None, description = None, qual = None ):
+
+    def update(self, id=None, seq=None, description=None, qual=None):
         self.id = id
         self.seq = seq
         self.description = description
         self.qual = qual
 
 # parse the fastq or fasta
-def parse(f, mode = 'fastq'):
+
+
+def parse(f, mode='fastq'):
     seq = Seq()
     output = []
     for i in f:
@@ -48,8 +52,10 @@ def parse(f, mode = 'fastq'):
         yield seq
 
 # calculate codon's relative frequency from orf of gene
+
+
 def codonfreq(orf):
-    #for i in orf[::3]
+    # for i in orf[::3]
     n = len(orf)
     freq = {}
     for i in xrange(0, n, 3):
@@ -57,6 +63,7 @@ def codonfreq(orf):
 
 
 mean = lambda x: 1. * sum(x) / len(x)
+
 
 def std(x):
     if len(x) <= 1:
@@ -78,8 +85,11 @@ def euclidean(x, y):
 
 # dist between x and y
 # the dist can be normalized by the norm of x or y
-def dist(x, y, n = 0):
-    nx, ny, nz = [elem ** .5 for elem in map(sum, [[xi ** 2 for xi in x], [yi ** 2 for yi in y], [(yi - xi) ** 2 for xi, yi in zip(x, y)]])]
+
+
+def dist(x, y, n=0):
+    nx, ny, nz = [elem ** .5 for elem in map(sum, [[xi ** 2 for xi in x], [
+                                             yi ** 2 for yi in y], [(yi - xi) ** 2 for xi, yi in zip(x, y)]])]
     return n == 0 and nz / nx or nz / ny
 
 
@@ -103,9 +113,11 @@ def pearson(x, y):
 
 
 # Cumulative Normal Distrubtion
-ncdf = lambda x : erfc(-x / 1.4142135623730951) / 2
+ncdf = lambda x: erfc(-x / 1.4142135623730951) / 2
 
 # rank the sorted data
+
+
 def rankdata(val):
     n = len(val)
     ts = []
@@ -117,7 +129,7 @@ def rankdata(val):
                 #ri = float(start + end) / (i - start)
                 ri = (start + end) / 2.
                 ts.append(i - start)
-                #print 'hello', ri, i, start
+                # print 'hello', ri, i, start
                 for j in xrange(start, i):
                     rank[j] = ri
 
@@ -128,22 +140,25 @@ def rankdata(val):
     if start < end:
         ri = float(start + end) / 2.
         ts.append(n - start)
-        #print 'hello', ri
+        # print 'hello', ri
         for j in xrange(start, n):
             rank[j] = ri
 
     # correct start from 0
-    #for i in xrange(n):
+    # for i in xrange(n):
     #    rank[i] += 1
 
     return rank, ts
 
 # tiecorrect
-tiecorrect = lambda ts, n: ts and 1 - sum([t ** 3. - t for t in ts]) / (n ** 3 - n) or 1
+tiecorrect = lambda ts, n: ts and 1 - \
+    sum([t ** 3. - t for t in ts]) / (n ** 3 - n) or 1
 
 # Mann–Whitney U test
 # return the z score of U
-def mannwhitneyu(x, y, use_continuity = True, alternative = 'two-sided'):
+
+
+def mannwhitneyu(x, y, use_continuity=True, alternative='two-sided'):
     n0, n1 = map(len, [x, y])
     n = n0 + n1
     val = [0] * n
@@ -201,22 +216,24 @@ def mannwhitneyu(x, y, use_continuity = True, alternative = 'two-sided'):
     var = n0 * n1 * (n + 1) * tiecorrect(ts, n) / 12.
     sd = var ** .5
     z = use_continuity and abs(u - mu) - .5 / sd or abs(u - mu) / sd
-    #print 'z u0 u1 u mu sigma n0 n1 n'
+    # print 'z u0 u1 u mu sigma n0 n1 n'
     if z >= 0:
         p = 2 - 2 * ncdf(z)
     else:
         p = 2 * ncdf(z)
-    #return u, p
-    #return abs(z)
+    # return u, p
+    # return abs(z)
     return p
 
 # ks test
+
+
 def ks_test(x, y):
     pass
 
 
 # compare whether two dataset belong to same distrubtion, use the correlation
-def curve_cor(s0, s1, bins = 20):
+def curve_cor(s0, s1, bins=20):
     up = max(map(max, s0, s1))
     lo = min(map(min, s0, s1))
     inc = (up - lo + 1.) / bins
@@ -233,14 +250,16 @@ def curve_cor(s0, s1, bins = 20):
 
 # draw the kmer-freq distrubtion from sequence
 # remove the extreme point
-def khist(s, bins = 20):
+
+
+def khist(s, bins=20):
 
     # remove extreme point
     u, r = mean(s), std(s)
     # lower and up bound
     lb, ub = u - r, u + r
     S = [elem for elem in s if lb <= elem <= ub]
-    #print 'remove', len(s) - len(S), u, r, lb, ub
+    # print 'remove', len(s) - len(S), u, r, lb, ub
     if not S:
         S = s
 
@@ -255,8 +274,11 @@ def khist(s, bins = 20):
     return h, lo, up, inc
 
 # 2d matrix class which is memory-efficent
+
+
 class mat:
-    def __init__(self, data = None, shape = None, dtype = 'f'):
+
+    def __init__(self, data=None, shape=None, dtype='f'):
         if dtype == 'int32':
             self.dtype = 'i'
         elif dtype == 'uint32':
@@ -277,28 +299,28 @@ class mat:
         self.shape = shape
         self.data = data
         #self.data = array(self.dtype)
-        #self.data.extend(data)
+        # self.data.extend(data)
         self.NONE = slice(None, None, None)
 
     # get elem
     def __getitem__(self, (x, y)):
         NONE = self.NONE
-        #print 'x', x, x is NONE
-        #print 'y', y, y is NONE
+        # print 'x', x, x is NONE
+        # print 'y', y, y is NONE
         X, Y = self.shape
         if isinstance(x, int):
             assert x < X
         if isinstance(y, int):
             assert y < Y
 
-        #if x != NONE and y != NONE:
+        # if x != NONE and y != NONE:
         if not isinstance(x, slice) and not isinstance(y, slice):
             out = self.data[Y * x + y]
-        #elif x != NONE and y == NONE:
-        elif not isinstance(x , slice) and isinstance(y, slice):
+        # elif x != NONE and y == NONE:
+        elif not isinstance(x, slice) and isinstance(y, slice):
             start = Y * x
             out = self.data[start: start + Y]
-        #elif x == NONE and y != NONE:
+        # elif x == NONE and y != NONE:
         elif isinstance(x, slice) and not isinstance(y, slice):
             out = array(self.dtype)
             for i in xrange(X):
@@ -316,14 +338,14 @@ class mat:
         if isinstance(y, int):
             assert y < Y
 
-        #if x != NONE and y != NONE:
+        # if x != NONE and y != NONE:
         if not isinstance(x, slice) and not isinstance(y, slice):
             self.data[Y * x + y] = z
-        #elif x != NONE and y == NONE:
-        elif not isinstance(x , slice) and isinstance(y, slice):
+        # elif x != NONE and y == NONE:
+        elif not isinstance(x, slice) and isinstance(y, slice):
             start = Y * x
             self.data[start: start + Y] = z
-        #elif x == NONE and y != NONE:
+        # elif x == NONE and y != NONE:
         elif isinstance(x, slice) and not isinstance(y, slice):
             for i in xrange(X):
                 self.data[Y * i + y] = z
@@ -338,11 +360,14 @@ class mat:
         return self.shape[0]
 
 # dist calculation for one vs many
-def Mdist(rg, q, data, dist = mannwhitneyu):
+
+
+def Mdist(rg, q, data, dist=mannwhitneyu):
     start, end = rg
     x, shape = data
     xs = mat(x, shape)
     return [dist(q, xs[elem, :]) for elem in xrange(start, end)]
+
 
 def mdist(z):
     rg, q, dist = z
@@ -353,7 +378,7 @@ def mdist(z):
 
 
 # parallel for Mdist
-def Pmdist(q, t, dist = mannwhitneyu):
+def Pmdist(q, t, dist=mannwhitneyu):
     shape = t.shape
     raw = t.data
     data = (raw, shape)
@@ -363,20 +388,21 @@ def Pmdist(q, t, dist = mannwhitneyu):
     rg = range(0, shape[0], step) + [shape[0]]
 
     pool = Pool()
-    output = pool.map(mdist, [[(i, j), t[0, :], dist] for i, j in zip(rg[::-1], rg[1::])])
+    output = pool.map(mdist, [[(i, j), t[0, :], dist]
+                              for i, j in zip(rg[::-1], rg[1::])])
     return output
-    #return pool.map(dist, [(i, j) for i, j in zip(rg[::-1], rg[1::])])
+    # return pool.map(dist, [(i, j) for i, j in zip(rg[::-1], rg[1::])])
 
 
 # the canopy algoithm
 # for euc, t1 > t2
 # for cor, t1 < t2
-#def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
-def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
+# def canopy(data, t1 = 2., t2 = 1.5, dist = pearson):
+def canopy(data, t1=0, t2=1e-3, dist=mannwhitneyu):
     #canopies = []
     canopies = open('canopies.npy', 'w')
     #idxs = range(len(data))
-    idxs =  array('i')
+    idxs = array('i')
     for i in xrange(len(data)):
         idxs.append(i)
 
@@ -395,7 +421,7 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
         #can = [idx]
         can = array('i', [idx])
         #del can[:]
-        #can.append(idx)
+        # can.append(idx)
 
         #keep = []
         keep = array('i')
@@ -404,23 +430,23 @@ def canopy(data, t1 = 0, t2 = 1e-3, dist = mannwhitneyu):
         if dist == pearson or mannwhitneyu:
             print 'pearson'
             for elem in idxs:
-            #while idxs:
-            #    elem = idxs.pop()
+                # while idxs:
+                #    elem = idxs.pop()
                 if dist(x, data[elem, :]) > t1:
                     can.append(elem)
                 if dist(x, data[elem, :]) < t2:
                     keep.append(elem)
-                #print 'size', len(idxs)
+                # print 'size', len(idxs)
         else:
             for elem in idxs:
-            #while idxs:
-            #    elem = idxs.pop()
+                # while idxs:
+                #    elem = idxs.pop()
                 if dist(x, data[elem, :]) < t1:
                     can.append(elem)
                 if dist(x, data[elem, :]) > t2:
                     keep.append(elem)
 
-        #canopies.append(can)
+        # canopies.append(can)
         # use -1 as sep and save to disk
         can.append(-1)
         can.tofile(canopies)
@@ -443,7 +469,7 @@ scale = max(code) + 1
 
 
 # fast convert kmer to number
-def k2n(s, scale = 4, code = code):
+def k2n(s, scale=4, code=code):
     if scale == -1:
         scale = code.max() + 1
     N = 0
@@ -457,30 +483,33 @@ def k2n(s, scale = 4, code = code):
 
 # use the current s2n value to calcuate the next one
 #s2n_next = lambda start, ksize, scale, code, char: start % (scale ** (ksize - 1)) * scale + code[ord(char)]
-s2n_next = lambda start, ksize, scale, code, char: start % (pow(scale, (ksize - 1))) * scale + code[ord(char)]
+s2n_next = lambda start, ksize, scale, code, char: start % (
+    pow(scale, (ksize - 1))) * scale + code[ord(char)]
 
 
 # convert kmer to number from a seq
-def seq2n(s, k = 15, scale = 4, code = code):
+def seq2n(s, k=15, scale=4, code=code):
     if len(s) <= k:
         yield k2n(s, scale, code)
     else:
         start = k2n(s[: k], scale, code)
         yield start
-        for i in s[k: ]:
+        for i in s[k:]:
             start = s2n_next(start, k, scale, code, i)
             yield start
 
 
 # generate the kmer frequence table
-def kmc(seq, buck, k = 5, scale = 4, code = code):
+def kmc(seq, buck, k=5, scale=4, code=code):
     N = len(seq)
     for i in xrange(N - k + 1):
-        start = k2n(seq[i: i + k], scale = scale, code = code)
+        start = k2n(seq[i: i + k], scale=scale, code=code)
         buck[start] += 1
 
 # fast version of generate the kmer frequence table
-def fkmc(seq, buck, k = 5, scale = 4, code = code):
+
+
+def fkmc(seq, buck, k=5, scale=4, code=code):
     for i in seq2n(seq, k, scale, code):
         val = buck[i]
         if val < 65535:
@@ -491,21 +520,23 @@ def fkmc(seq, buck, k = 5, scale = 4, code = code):
 col_zero = lambda buck, i, N: not any([buck[elem][i] for elem in xrange(N)])
 
 # compress the array by del all zeros col
+
+
 def compress(buck):
     p0 = p1 = 0
     N, D = map(len, [buck, buck[0]])
     print 'before', D
     while 1:
         while not col_zero(buck, p0, N) and p0 < D:
-            #print 'all zero'
+            # print 'all zero'
             p0 += 1
 
         while p1 < N and (col_zero(buck, p1, N) or p1 <= p0):
-            #print 'not all zero'
+            # print 'not all zero'
             p1 += 1
 
         if p0 < p1 < D:
-            #print 'change'
+            # print 'change'
             for i in xrange(N):
                 buck[i][p0], buck[i][p1] = buck[i][p1], buck[i][p0]
         else:
@@ -524,7 +555,7 @@ def compress(buck):
 # count the kmer from the paired fastq file
 def fq2c(qry):
     k = int(eval(qry[0]))
-    names = qry[1: ]
+    names = qry[1:]
     D = len(names)
     scale = 4
     buck = [array('H', [0]) * pow(scale, k) for elem in xrange(D // 2)]
@@ -587,10 +618,10 @@ def fq2c(qry):
             if len(output) < 32:
                 output.extend([0] * (32 - len(output)))
 
-            #print max(output), min(output), mean(output), std(output), output
+            # print max(output), min(output), mean(output), std(output), output
             #A, B, C, D = khist(output)
-            #print ' '.join(map(str, A + ['|', B, C, D]))
-            #print ' '.join(map(str, output))
+            # print ' '.join(map(str, A + ['|', B, C, D]))
+            # print ' '.join(map(str, output))
 
             # timing
             if itr % 1000000 == 0:
@@ -631,8 +662,5 @@ if __name__ == '__main__':
     #
     if len(sys.argv[1:]) < 2:
         print 'python this.py k foo0_f.fq foo0_r.fq foo1_f.fq foo1_r.fq ... fooN_f.fq fooN_r.fq'
-    buck = fq2c(sys.argv[1: ])
+    buck = fq2c(sys.argv[1:])
     print sum(map(sum, buck)), len(buck), len(buck[0])
-
-
-
