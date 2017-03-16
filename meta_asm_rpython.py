@@ -695,7 +695,7 @@ def ks_statistic(obs_one, obs_two):
 
 def ks_significance(alam):
     EPS1 = .001
-    EPS2 = 1.0e-8
+    EPS2 = 1e-8
 
     fac = 2.
     flag = 0.
@@ -713,11 +713,11 @@ def ks_significance(alam):
 
     # failing to converge
     return 1.0
+
+
 """
   from numerical recipies
 """
-
-
 def ks_test(obs_one, obs_two):
     d = ks_statistic(obs_one, obs_two)
     # print 'd is', d
@@ -1468,8 +1468,8 @@ def run(n, qry):
     qsort(Atmp, dna)
     print 'qsort', Atmp, [dna[elem] for elem in Atmp]
     for i in xrange(1):
-        #x = [0] * 32
-        #y = [0] * 32
+        x = [0] * 32
+        y = [0] * 32
         # for j in xrange(32):
         #    x[j] = rg.random()
         #    y[j] = rg.random()
